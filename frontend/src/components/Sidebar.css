@@ -1,11 +1,19 @@
 .sidebar {
   width: 220px;
-  min-height: 100vh;
+  height: 100vh;
   background: #1a1a1a;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition: width 0.3s ease;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 70px;
 }
 
 .sidebar-header {
@@ -15,6 +23,8 @@
   align-items: center;
   gap: 10px;
   border-bottom: 3px solid #6b0000;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -37,6 +47,40 @@
   font-size: 15px;
   letter-spacing: 2px;
   text-transform: uppercase;
+  flex: 1;
+}
+
+.sidebar-toggle {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding: 14px 10px;
+  justify-content: center;
+}
+
+.sidebar-user-collapsed {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
 }
 
 .sidebar-user {
@@ -45,6 +89,7 @@
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
 }
 
 .sidebar-avatar {
@@ -82,6 +127,25 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .sidebar-link {
@@ -94,6 +158,12 @@
   font-size: 13px;
   transition: all 0.15s;
   border-left: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.sidebar.collapsed .sidebar-link {
+  padding: 10px;
+  justify-content: center;
 }
 
 .sidebar-link:hover {
@@ -116,6 +186,7 @@
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
 }
 
 .sidebar-logout {
@@ -129,6 +200,12 @@
   cursor: pointer;
   transition: all 0.15s;
   text-align: left;
+  white-space: nowrap;
+}
+
+.sidebar.collapsed .sidebar-logout {
+  text-align: center;
+  padding: 9px 5px;
 }
 
 .sidebar-logout:hover {

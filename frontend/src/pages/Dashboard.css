@@ -1,7 +1,8 @@
 .dash-root {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background: #111;
+  overflow: hidden;
 }
 
 .dash-main {
@@ -9,6 +10,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100vh;
 }
 
 /* Top Bar */
@@ -65,6 +67,24 @@
   flex: 1;
   padding: 20px 24px;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.dash-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dash-content::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.dash-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.dash-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* KPI Cards */
@@ -110,7 +130,60 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
+}
+
+/* Date Selector */
+.date-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-selector label {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.date-selector select {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+  min-width: 60px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-selector select:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.date-selector select:focus {
+  border-color: #8B0000;
+  background: rgba(255,255,255,0.1);
+}
+
+/* Make select dropdown scrollable with fixed size */
+.date-selector select option {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 6px 10px;
 }
 
 /* Shift Cards */
@@ -189,18 +262,89 @@
   color: #fff;
 }
 
+/* Chart Grids */
+.shift-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.double-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Compact Date Selector for Charts */
+.date-selector-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-selector-compact label {
+  color: rgba(255,255,255,0.5);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-right: 2px;
+}
+
+.date-selector-compact select {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+  min-width: 50px;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-selector-compact select:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.date-selector-compact select:focus {
+  border-color: #8B0000;
+  background: rgba(255,255,255,0.1);
+}
+
+.date-selector-compact select option {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 4px 6px;
+}
+
 /* Chart Box */
 .chart-box {
   background: #1a1a1a;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
-  padding: 20px;
+  padding: 16px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .chart-heading {
   color: rgba(255,255,255,0.6);
-  font-size: 12px;
-  margin-bottom: 16px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  line-height: 1.3;
 }

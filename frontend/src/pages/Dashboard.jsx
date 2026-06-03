@@ -3,12 +3,13 @@ import {
   dashboardKPIs,
   shiftData,
   hourlyData,
+  dailyData,
   wipLocations,
   monthlyData,
 } from '../data/mockData'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, LineChart, Line
+  Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import { useState } from 'react'
 import './Dashboard.css'
@@ -36,14 +37,62 @@ const ShiftCard = ({ shift, data }) => (
 )
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('hourly')
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  
+  // Date selectors for Shift Summary, Shift Charts, and Hourly Production (all use the same date)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date()
+    return today.getDate()
+  })
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date()
+    return today.getMonth() + 1 // 1-12
+  })
+  const [selectedYear, setSelectedYear] = useState(2026)
+  
+  // Separate selectors for Daily Production (uses month + year)
+  const [dailyMonth, setDailyMonth] = useState(() => {
+    const today = new Date()
+    return today.getMonth() + 1
+  })
+  const [dailyYear, setDailyYear] = useState(2026)
+  
+  // Separate selector for Monthly Production (uses only year)
+  const [monthlyYear, setMonthlyYear] = useState(2026)
+  
   const today = new Date().toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric'
   })
+  
+  // Generate date options (1-31)
+  const dateOptions = Array.from({ length: 31 }, (_, i) => i + 1)
+  
+  // Month options
+  const monthOptions = [
+    { value: 1, label: 'JAN' },
+    { value: 2, label: 'FEB' },
+    { value: 3, label: 'MAR' },
+    { value: 4, label: 'APR' },
+    { value: 5, label: 'MAY' },
+    { value: 6, label: 'JUN' },
+    { value: 7, label: 'JUL' },
+    { value: 8, label: 'AUG' },
+    { value: 9, label: 'SEP' },
+    { value: 10, label: 'OCT' },
+    { value: 11, label: 'NOV' },
+    { value: 12, label: 'DEC' },
+  ]
+  
+  // Year options (2024-2030)
+  const yearOptions = Array.from({ length: 7 }, (_, i) => 2024 + i)
+  
+  const getMonthLabel = (monthNum) => {
+    return monthOptions.find(m => m.value === monthNum)?.label || ''
+  }
 
   return (
     <div className="dash-root">
-      <Sidebar />
+      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       <div className="dash-main">
 
         {/* Top Bar */}
@@ -71,7 +120,27 @@ export default function Dashboard() {
           </div>
 
           {/* Shift Summary Cards */}
-          <div className="section-title">Shift Summary — {today}</div>
+          <div className="section-header">
+            <div className="section-title">Shift Summary — {selectedDate}-{getMonthLabel(selectedMonth)}-{selectedYear}</div>
+            <div className="date-selector">
+              <label>Date:</label>
+              <select value={selectedDate} onChange={(e) => setSelectedDate(Number(e.target.value))}>
+                {dateOptions.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}>
+                {monthOptions.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}>
+                {yearOptions.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="shift-row-grid">
             <ShiftCard shift="A" data={shiftData.A} />
             <ShiftCard shift="B" data={shiftData.B} />
@@ -79,73 +148,153 @@ export default function Dashboard() {
           </div>
 
           {/* Charts Section */}
-          <div className="section-title">Production Charts</div>
-          <div className="chart-tabs">
-            {['hourly', 'monthly', 'wip'].map(tab => (
-              <button
-                key={tab}
-                className={`chart-tab ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'hourly'   ? 'Hourly'         : ''}
-                {tab === 'monthly'  ? 'Monthly'        : ''}
-                {tab === 'wip'      ? 'WIP Locations'  : ''}
-              </button>
+          <div className="section-title" style={{ marginBottom: '16px', marginTop: '24px' }}>Production Charts (Date: {selectedDate}-{getMonthLabel(selectedMonth)}-{selectedYear})</div>
+
+          {/* Shift Production Charts - 3 in a row */}
+          <div className="shift-charts-grid">
+            {['A', 'B', 'C'].map(shift => (
+              <div key={shift} className="chart-box">
+                <div className="chart-header">
+                  <div className="chart-heading">Shift {shift} Production</div>
+                </div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={hourlyData.slice(0, 8)} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis 
+                      dataKey="hour" 
+                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }} 
+                      height={30}
+                    />
+                    <YAxis 
+                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                      width={35}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        background: '#1e1e1e', 
+                        border: '1px solid rgba(255,255,255,0.15)', 
+                        borderRadius: 8, 
+                        color: '#fff',
+                        fontSize: 10
+                      }} 
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: 8 }}
+                      iconSize={8}
+                    />
+                    <Bar dataKey="oldLine" name="Old" fill="#2196F3" radius={[2,2,0,0]} />
+                    <Bar dataKey="newLine" name="New" fill="#FF9800" radius={[2,2,0,0]} />
+                    <Bar dataKey="testCycle" name="Test" fill="#8B0000" radius={[2,2,0,0]} />
+                    <Bar dataKey="fes" name="FES" fill="#FF5252" radius={[2,2,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ))}
           </div>
 
-          <div className="chart-box">
-            {activeTab === 'hourly' && (
-              <>
-                <div className="chart-heading">Hourly Production — Today</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={hourlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="hour" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} label={{ value: 'Hour', position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                    <Bar dataKey="oldLine" name="Old Line" fill="#2196F3" radius={[4,4,0,0]} />
-                    <Bar dataKey="newLine" name="New Line" fill="#FF9800" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+          {/* Hourly Production Chart - Full width */}
+          <div className="chart-box" style={{ marginTop: '16px' }}>
+            <div className="chart-header">
+              <div className="chart-heading">Hourly Production</div>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={hourlyData} margin={{ top: 10, right: 20, left: 5, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                <XAxis 
+                  dataKey="hour" 
+                  tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} width={45} />
+                <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
+                <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} iconSize={10} />
+                <Bar dataKey="oldLine" name="Old Line" fill="#2196F3" radius={[3,3,0,0]} />
+                <Bar dataKey="newLine" name="New Line" fill="#FF9800" radius={[3,3,0,0]} />
+                <Bar dataKey="testCycle" name="Test Cycle" fill="#8B0000" radius={[3,3,0,0]} />
+                <Bar dataKey="fes" name="FES" fill="#FF5252" radius={[3,3,0,0]} />
+                <Bar dataKey="dispatched" name="Dispatched" fill="#FFC107" radius={[3,3,0,0]} />
+                <Bar dataKey="testOK" name="Test OK" fill="#4CAF50" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-            {activeTab === 'monthly' && (
-              <>
-                <div className="chart-heading">Monthly Production — 2026</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                    <Bar dataKey="production" name="Total Production" fill="#4CAF50" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+          {/* Daily and Monthly Charts - 2 in a row */}
+          <div className="double-chart-grid">
+            {/* Daily Production Chart */}
+            <div className="chart-box">
+              <div className="chart-header">
+                <div className="chart-heading">Daily Production of Month: {getMonthLabel(dailyMonth)} {dailyYear}</div>
+                <div className="date-selector-compact">
+                  <select value={dailyMonth} onChange={(e) => setDailyMonth(Number(e.target.value))}>
+                    {monthOptions.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <select value={dailyYear} onChange={(e) => setDailyYear(Number(e.target.value))}>
+                    {yearOptions.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={dailyData} margin={{ top: 10, right: 15, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis 
+                    dataKey="day" 
+                    tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 9 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }} width={40} />
+                  <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff', fontSize: 10 }} />
+                  <Legend wrapperStyle={{ fontSize: 9, paddingTop: 10 }} iconSize={8} />
+                  <Bar dataKey="oldLine" name="Old Line" fill="#2196F3" radius={[2,2,0,0]} />
+                  <Bar dataKey="newLine" name="New Line" fill="#FF9800" radius={[2,2,0,0]} />
+                  <Bar dataKey="testCycle" name="Test Cycle" fill="#8B0000" radius={[2,2,0,0]} />
+                  <Bar dataKey="fes" name="FES" fill="#FF5252" radius={[2,2,0,0]} />
+                  <Bar dataKey="dispatched" name="Dispatched" fill="#FFC107" radius={[2,2,0,0]} />
+                  <Bar dataKey="testOK" name="Test OK" fill="#4CAF50" radius={[2,2,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-            {activeTab === 'wip' && (
-              <>
-                <div className="chart-heading">WIP by Location — Current</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={wipLocations}
-                    layout="vertical"
-                    margin={{ top: 10, right: 30, left: 90, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis type="number" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <YAxis dataKey="location" type="category" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} width={88} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Bar dataKey="count" name="WIP Count" fill="#2196F3" radius={[0,4,4,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+            {/* Monthly Production Chart */}
+            <div className="chart-box">
+              <div className="chart-header">
+                <div className="chart-heading">Monthly Production of Year: {monthlyYear}</div>
+                <div className="date-selector-compact">
+                  <label>Year:</label>
+                  <select value={monthlyYear} onChange={(e) => setMonthlyYear(Number(e.target.value))}>
+                    {yearOptions.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={monthlyData} margin={{ top: 10, right: 15, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }} width={40} />
+                  <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff', fontSize: 10 }} />
+                  <Legend wrapperStyle={{ fontSize: 9, paddingTop: 10 }} iconSize={8} />
+                  <Bar dataKey="oldLine" name="Old Line Prod" fill="#2196F3" radius={[3,3,0,0]} />
+                  <Bar dataKey="newLine" name="New Line Prod" fill="#FF9800" radius={[3,3,0,0]} />
+                  <Bar dataKey="testCall" name="Test Call" fill="#8B0000" radius={[3,3,0,0]} />
+                  <Bar dataKey="fes" name="FES" fill="#00BCD4" radius={[3,3,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
         </div>
