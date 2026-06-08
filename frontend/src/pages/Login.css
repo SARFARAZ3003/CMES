@@ -196,3 +196,38 @@
   font-size: 11px;
   color: rgba(255,255,255,0.25);
 }
+
+/* Avatar initial letter instead of emoji */
+.avatar-initial {
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  line-height: 1;
+}
+
+/* WWID field — slightly dimmer to signal it's read-only */
+.user-id {
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* Warning shown for unregistered computers */
+.sso-warn {
+  font-size: 11px;
+  color: #FF9800;
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  background: rgba(255,152,0,0.08);
+  border: 1px solid rgba(255,152,0,0.25);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+/* Disabled login button for unregistered computers */
+.login-btn:disabled:not(.loading) {
+  background: rgba(139,0,0,0.3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}

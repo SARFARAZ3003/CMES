@@ -271,3 +271,26 @@
 .ems-table td {
   text-align: left;
 }
+
+/* Production report summary table — compact, left-aligned */
+.prod-report-table {
+  max-width: 500px;
+}
+
+.prod-report-table td:nth-child(3),
+.prod-report-table td:nth-child(4),
+.prod-report-table th:nth-child(3),
+.prod-report-table th:nth-child(4) {
+  text-align: center;
+}
+
+/* FES table */
+.fes-table {
+  min-width: 700px;
+}
+
+.fes-table td:first-child,
+.fes-table th:first-child {
+  text-align: center;
+  width: 50px;
+}

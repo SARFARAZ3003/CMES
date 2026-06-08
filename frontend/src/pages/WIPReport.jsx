@@ -39,11 +39,40 @@ const modelTrackingData = [
   { modelNo: 'SOA1445', fes: 1, wip: 0, qualityDock: 0, paintLine: 0, testCallLine: 1, paintRepair: 0, testRework: 0, shortBuild: 0, eqaAudit: 0, mra: 0, pe: 0, unknown: 0 },
 ]
 
+// Mock data for production report summary
+const productionReportData = [
+  { date: '26-May-2026', shift: 'A', quantity: 101, fes: 98 },
+  { date: '26-May-2026', shift: 'B', quantity: 0,   fes: 0  },
+  { date: '26-May-2026', shift: 'C', quantity: 0,   fes: 0  },
+]
+
+// Mock data for FES table
+const fesData = [
+  { no: 1,  esno: 'G4593528', modelNo: 'SOA4815', jobOrderNo: '3188771-18', fesDate: '26-05-2026 06:29:28' },
+  { no: 2,  esno: 'G4594683', modelNo: 'SOA4819', jobOrderNo: '3185810-12', fesDate: '26-05-2026 06:20:58' },
+  { no: 3,  esno: 'G4594596', modelNo: 'SOA4929', jobOrderNo: '3189772-6',  fesDate: '26-05-2026 06:21:06' },
+  { no: 4,  esno: 'G4594645', modelNo: 'SOA4929', jobOrderNo: '3185863-2',  fesDate: '26-05-2026 06:21:13' },
+  { no: 5,  esno: 'G4594983', modelNo: 'SOA0215', jobOrderNo: '3188764-1',  fesDate: '26-05-2026 06:29:32' },
+  { no: 6,  esno: 'G4594877', modelNo: 'SOA4561', jobOrderNo: '3191757-4',  fesDate: '26-05-2026 06:29:39' },
+  { no: 7,  esno: 'G4594873', modelNo: 'SOA1756', jobOrderNo: '3176815-3',  fesDate: '26-05-2026 06:29:52' },
+  { no: 8,  esno: 'G4594733', modelNo: 'SOA4819', jobOrderNo: '3185870-9',  fesDate: '26-05-2026 06:29:59' },
+  { no: 9,  esno: 'G4594602', modelNo: 'SOA4819', jobOrderNo: '3185810-11', fesDate: '26-05-2026 06:30:06' },
+  { no: 10, esno: 'G4594853', modelNo: 'SOA4372', jobOrderNo: '3191758-5',  fesDate: '26-05-2026 06:35:26' },
+  { no: 11, esno: 'G4594524', modelNo: 'SOA0341', jobOrderNo: '3192779-8',  fesDate: '26-05-2026 06:39:42' },
+  { no: 12, esno: 'G4594755', modelNo: 'SOA4815', jobOrderNo: '3185870-11', fesDate: '26-05-2026 06:45:53' },
+  { no: 13, esno: 'G4594659', modelNo: 'SOA4529', jobOrderNo: '3185864-5',  fesDate: '26-05-2026 06:45:59' },
+]
+
 export default function WIPReport() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [engineSearch, setEngineSearch] = useState('')
+  const [prodDate, setProdDate] = useState('26-May-2026')
 
+  const prodTotal = productionReportData.reduce(
+    (acc, r) => ({ quantity: acc.quantity + r.quantity, fes: acc.fes + r.fes }),
+    { quantity: 0, fes: 0 }
+  )
   const total = wipLocationData.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
@@ -53,11 +82,80 @@ export default function WIPReport() {
         {/* Top Bar */}
         <div className="wip-topbar">
           <div className="wip-topbar-left">
-            <span className="wip-page-title">WIP Report</span>
+            <span className="wip-page-title">CMES Report</span>
           </div>
         </div>
 
         <div className="wip-content">
+
+          {/* Production Report Section */}
+          <div className="wip-section">
+            <div className="wip-section-header">PRODUCTION REPORT</div>
+            <div className="search-row">
+              <label>Date:</label>
+              <input
+                type="text"
+                value={prodDate}
+                onChange={(e) => setProdDate(e.target.value)}
+                placeholder="26-May-2026"
+              />
+              <button className="search-btn">QUERY</button>
+            </div>
+            <table className="wip-table prod-report-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>SHIFT</th>
+                  <th>QUANTITY</th>
+                  <th>FES</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productionReportData.map((row, idx) => (
+                  <tr key={idx}>
+                    <td>{row.date}</td>
+                    <td>{row.shift}</td>
+                    <td>{row.quantity}</td>
+                    <td>{row.fes}</td>
+                  </tr>
+                ))}
+                <tr className="total-row">
+                  <td colSpan={2}><strong>TOTAL</strong></td>
+                  <td><strong>{prodTotal.quantity}</strong></td>
+                  <td><strong>{prodTotal.fes}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* FES Section */}
+          <div className="wip-section">
+            <div className="wip-section-header">FES</div>
+            <div className="wip-table-scroll">
+              <table className="wip-table fes-table">
+                <thead>
+                  <tr>
+                    <th>NO</th>
+                    <th>ESNO</th>
+                    <th>MODEL NO</th>
+                    <th>JOB ORDER NO</th>
+                    <th>FES DATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fesData.map((row) => (
+                    <tr key={row.no}>
+                      <td>{row.no}</td>
+                      <td>{row.esno}</td>
+                      <td>{row.modelNo}</td>
+                      <td>{row.jobOrderNo}</td>
+                      <td>{row.fesDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
           {/* WIP Report Section */}
           <div className="wip-section">
             <div className="wip-section-header">WIP REPORT</div>

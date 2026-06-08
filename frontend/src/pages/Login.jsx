@@ -1,27 +1,23 @@
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { useUser } from '../context/UserContext'
 import './Login.css'
 
 export default function Login() {
   const navigate = useNavigate()
+  const user     = useUser()
   const [loading, setLoading] = useState(false)
-
-  // Simulate Windows SSO — username auto-detected
-  const windowsUser = 'CED\\od741'
 
   const handleLogin = () => {
     setLoading(true)
-    // Later: call ASP.NET API here for AD validation
-    setTimeout(() => {
-      navigate('/dashboard')
-    }, 1000)
+    // TODO: call ASP.NET API to validate against AD
+    setTimeout(() => navigate('/dashboard'), 1000)
   }
 
   return (
     <div className="login-root">
       <div className="bg-lines" />
 
-      {/* Header */}
       <div className="header-bar">
         <div className="cummins-logo">TCL</div>
         <div className="header-title">Manufacturing Execution System</div>
@@ -30,23 +26,26 @@ export default function Login() {
         <span>Tata Cummins Limited &nbsp;·&nbsp; Plant: Jamshedpur</span>
       </div>
 
-      {/* Card */}
       <div className="login-body">
         <div className="login-card">
+
           <div className="avatar-wrap">
             <div className="avatar">
-              <span className="avatar-icon">👤</span>
+              <span className="avatar-initial">
+                {user.name !== 'Unknown User' ? user.name.charAt(0) : '?'}
+              </span>
             </div>
             <div className="dept-badge">Windows SSO</div>
           </div>
 
+          {/* Single field — WWID, resolved from computer, not editable */}
           <div className="user-row">
-            <span className="user-label">Username</span>
-            <div className="user-value">{windowsUser}</div>
+            <span className="user-label">User ID</span>
+            <div className="user-value user-id">{user.wwid}</div>
           </div>
 
           <p className="sso-note">
-            Logged in via <span>Windows Active Directory</span>.<br />
+            Identity resolved via <span>Windows Active Directory</span>.<br />
             No password required.
           </p>
 
@@ -55,12 +54,11 @@ export default function Login() {
             onClick={handleLogin}
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Log In to MES'}
+            {loading ? 'Signing in…' : 'Log In to MES'}
           </button>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="footer-bar">
         <span>TCL MES v2.0 &nbsp;·&nbsp; Intern Project 2026</span>
       </div>

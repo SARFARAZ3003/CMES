@@ -1,18 +1,16 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { currentUser } from '../data/mockData'
+import { useUser } from '../context/UserContext'
 import { useState } from 'react'
 import './Sidebar.css'
 
 const navItems = [
-  { path: '/dashboard',         label: 'Production Dash',  icon: '📊' },
-  { path: '/wip-report',        label: 'WIP Report',       icon: '🔄' },
-  { path: '/production-report', label: 'Production Report',icon: '📋' },
-  { path: '/model-tracking',    label: 'Model Tracking',   icon: '🔍' },
-  { path: '/inventory',         label: 'Inventory',        icon: '📦' },
+  { path: '/dashboard',  label: 'Production Dash', icon: '📊' },
+  { path: '/wip-report', label: 'CMES Report',      icon: '📋' },
 ]
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const navigate = useNavigate()
+  const user     = useUser()
 
   const handleLogout = () => {
     navigate('/')
@@ -37,12 +35,12 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
       {!isCollapsed && (
         <div className="sidebar-user">
           <div className="sidebar-avatar">
-            {currentUser.name.charAt(0)}
+            {user.name.charAt(0)}
           </div>
           <div className="sidebar-user-info">
-            <div className="sidebar-user-name">{currentUser.name}</div>
+            <div className="sidebar-user-name">{user.name}</div>
             <div className="sidebar-user-meta">
-              {currentUser.code} · Shift {currentUser.shift}
+              {user.wwid} · Shift {user.shift}
             </div>
           </div>
         </div>
@@ -50,7 +48,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
       {isCollapsed && (
         <div className="sidebar-user-collapsed">
           <div className="sidebar-avatar">
-            {currentUser.name.charAt(0)}
+            {user.name.charAt(0)}
           </div>
         </div>
       )}
