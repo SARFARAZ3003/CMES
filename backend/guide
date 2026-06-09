@@ -1,0 +1,12 @@
+Controller ek receptionist hota hain.
+vo handle requrest handle krta hain and data return.
+
+
+Endpoint -> ek specific address jaha se data milta hain.
+React frontend in address pe request bhejega -> ASP.NET controller respond marega -> JSON data aayega
+
+
+SQL se data kaise aata hai : 
+React -> API call -> Controller -> Service -> SQL Query -> Database -> Result -> Service -> Controller -> JSON data -> React
+
+

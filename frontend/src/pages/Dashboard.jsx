@@ -1,16 +1,10 @@
+import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar'
-import {
-  dashboardKPIs,
-  shiftData,
-  hourlyData,
-  wipLocations,
-  monthlyData,
-} from '../data/mockData'
+import api from '../api/client'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, LineChart, Line
+  Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
-import { useState } from 'react'
 import './Dashboard.css'
 
 const KPICard = ({ label, value, sub, color }) => (
@@ -25,21 +19,39 @@ const ShiftCard = ({ shift, data }) => (
   <div className="shift-card">
     <div className="shift-header">Shift {shift}</div>
     <div className="shift-grid">
-      <div className="shift-row"><span>Old Line</span><strong>{data.oldLine}</strong></div>
-      <div className="shift-row"><span>New Line</span><strong>{data.newLine}</strong></div>
-      <div className="shift-row"><span>Test Cycle</span><strong>{data.testCycle}</strong></div>
-      <div className="shift-row"><span>FES</span><strong>{data.fes}</strong></div>
-      <div className="shift-row"><span>Dispatched</span><strong>{data.dispatched}</strong></div>
-      <div className="shift-row"><span>Test OK</span><strong>{data.testOK}</strong></div>
+      <div className="shift-row"><span>WS 33200</span><strong>{data.ws33200}</strong></div>
+      <div className="shift-row"><span>WS 23800</span><strong>{data.ws23800}</strong></div>
+      <div className="shift-row"><span>Test Cell</span><strong>{data.testCell}</strong></div>
+      <div className="shift-row"><span>Rework</span><strong>{data.rework}</strong></div>
+      <div className="shift-row"><span>Engines</span><strong>{data.engines}</strong></div>
+      <div className="shift-row"><span>Events</span><strong>{data.events}</strong></div>
     </div>
   </div>
 )
 
+const EMPTY_SHIFT = { ws33200: 0, ws23800: 0, testCell: 0, rework: 0, engines: 0, events: 0 }
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('hourly')
-  const today = new Date().toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric'
-  })
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.get('/Dashboard/overview')
+      .then(res => setData(res.data))
+      .catch(() => setError('Backend se data nahi mila. Kya server localhost:5000 pe chal raha hain?'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const dateLabel = data?.date
+    ? new Date(data.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : ''
+
+  const kpis = data?.kpis
+  const shifts = data?.shifts || { a: EMPTY_SHIFT, b: EMPTY_SHIFT, c: EMPTY_SHIFT }
+  const hourly = data?.hourly || []
+  const daily = data?.daily || []
 
   return (
     <div className="dash-root">
@@ -50,7 +62,7 @@ export default function Dashboard() {
         <div className="dash-topbar">
           <div className="dash-topbar-left">
             <span className="dash-page-title">Production Dashboard</span>
-            <span className="dash-date">{today}</span>
+            <span className="dash-date">{dateLabel}</span>
           </div>
           <div className="dash-topbar-right">
             <span className="dash-live-dot" />
@@ -60,93 +72,71 @@ export default function Dashboard() {
 
         <div className="dash-content">
 
-          {/* KPI Cards */}
-          <div className="kpi-row">
-            <KPICard label="Production Today"  value={dashboardKPIs.productionToday} sub="engines"  color="#4CAF50" />
-            <KPICard label="WIP Count"         value={dashboardKPIs.wipCount}        sub="in plant" color="#2196F3" />
-            <KPICard label="FES Done"          value={dashboardKPIs.fesCount}        sub="today"    color="#FF9800" />
-            <KPICard label="Test OK"           value={dashboardKPIs.testOK}          sub="cleared"  color="#9C27B0" />
-            <KPICard label="Dispatched"        value={dashboardKPIs.dispatched}      sub="today"    color="#F44336" />
-            <KPICard label="Active Models"     value={dashboardKPIs.activeModels}    sub="variants" color="#00BCD4" />
-          </div>
+          {loading && <div className="section-title">Loading…</div>}
+          {error && <div className="section-title" style={{ color: '#EF7A70' }}>{error}</div>}
 
-          {/* Shift Summary Cards */}
-          <div className="section-title">Shift Summary — {today}</div>
-          <div className="shift-row-grid">
-            <ShiftCard shift="A" data={shiftData.A} />
-            <ShiftCard shift="B" data={shiftData.B} />
-            <ShiftCard shift="C" data={shiftData.C} />
-          </div>
+          {!loading && !error && kpis && (
+            <>
+              {/* KPI Cards */}
+              <div className="kpi-row">
+                <KPICard label="Engines Today"  value={kpis.enginesToday}  sub="assembly"   color="#4CAF50" />
+                <KPICard label="Events Today"   value={kpis.eventsToday}    sub="scans"      color="#2196F3" />
+                <KPICard label="In Test Cell"   value={kpis.inTestCell}     sub="today"      color="#FF9800" />
+                <KPICard label="Unique Serials" value={kpis.uniqueSerialsAll} sub="all time" color="#9C27B0" />
+                <KPICard label="Workstations"   value={kpis.workstations}   sub="active"     color="#F44336" />
+                <KPICard label="Total Records"  value={kpis.totalRecords.toLocaleString('en-IN')} sub="in DB" color="#00BCD4" />
+              </div>
 
-          {/* Charts Section */}
-          <div className="section-title">Production Charts</div>
-          <div className="chart-tabs">
-            {['hourly', 'monthly', 'wip'].map(tab => (
-              <button
-                key={tab}
-                className={`chart-tab ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'hourly'   ? 'Hourly'         : ''}
-                {tab === 'monthly'  ? 'Monthly'        : ''}
-                {tab === 'wip'      ? 'WIP Locations'  : ''}
-              </button>
-            ))}
-          </div>
+              {/* Shift Summary */}
+              <div className="section-title">Shift Summary — {dateLabel} (Assembly)</div>
+              <div className="shift-row-grid">
+                <ShiftCard shift="A" data={shifts.a} />
+                <ShiftCard shift="B" data={shifts.b} />
+                <ShiftCard shift="C" data={shifts.c} />
+              </div>
 
-          <div className="chart-box">
-            {activeTab === 'hourly' && (
-              <>
-                <div className="chart-heading">Hourly Production — Today</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={hourlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="hour" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} label={{ value: 'Hour', position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                    <Bar dataKey="oldLine" name="Old Line" fill="#2196F3" radius={[4,4,0,0]} />
-                    <Bar dataKey="newLine" name="New Line" fill="#FF9800" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+              {/* Charts */}
+              <div className="section-title">Production Charts</div>
+              <div className="chart-tabs">
+                <button className={`chart-tab ${activeTab === 'hourly' ? 'active' : ''}`} onClick={() => setActiveTab('hourly')}>Hourly</button>
+                <button className={`chart-tab ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => setActiveTab('daily')}>Daily</button>
+              </div>
 
-            {activeTab === 'monthly' && (
-              <>
-                <div className="chart-heading">Monthly Production — 2026</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                    <Bar dataKey="production" name="Total Production" fill="#4CAF50" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+              <div className="chart-box">
+                {activeTab === 'hourly' && (
+                  <>
+                    <div className="chart-heading">Hourly Engines — {dateLabel}</div>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={hourly} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="hour" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} label={{ value: 'Hour', position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} />
+                        <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
+                        <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
+                        <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+                        <Bar dataKey="ws33200" name="WS 33200" fill="#2196F3" radius={[4,4,0,0]} />
+                        <Bar dataKey="ws23800" name="WS 23800" fill="#FF9800" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
 
-            {activeTab === 'wip' && (
-              <>
-                <div className="chart-heading">WIP by Location — Current</div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={wipLocations}
-                    layout="vertical"
-                    margin={{ top: 10, right: 30, left: 90, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis type="number" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <YAxis dataKey="location" type="category" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} width={88} />
-                    <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                    <Bar dataKey="count" name="WIP Count" fill="#2196F3" radius={[0,4,4,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
-          </div>
+                {activeTab === 'daily' && (
+                  <>
+                    <div className="chart-heading">Daily Engines Produced</div>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={daily} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
+                        <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
+                        <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
+                        <Bar dataKey="engines" name="Engines" fill="#4CAF50" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
         </div>
       </div>

@@ -22,7 +22,7 @@ export default function Sidebar() {
       {/* Header */}
       <div className="sidebar-header">
         <div className="sidebar-logo">TCL</div>
-        <div className="sidebar-title">MES</div>
+        <div className="sidebar-title">CMES</div>
       </div>
 
       {/* User Info */}
@@ -59,7 +59,7 @@ export default function Sidebar() {
         <button className="sidebar-logout" onClick={handleLogout}>
           🚪 Log Out
         </button>
-        <div className="sidebar-version">TCL MES v2.0</div>
+        <div className="sidebar-version">TCL CMES v2.0</div>
       </div>
     </div>
   )

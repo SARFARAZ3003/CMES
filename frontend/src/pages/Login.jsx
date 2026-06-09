@@ -62,7 +62,7 @@ export default function Login() {
 
       {/* Footer */}
       <div className="footer-bar">
-        <span>TCL MES v2.0 &nbsp;·&nbsp; Intern Project 2026</span>
+        <span>TCL CMES v2.0 &nbsp;·&nbsp; Intern Project 2026</span>
       </div>
     </div>
   )
