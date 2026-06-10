@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
 import api from '../api/client'
 import {
@@ -15,43 +15,102 @@ const KPICard = ({ label, value, sub, color }) => (
   </div>
 )
 
+const SHIFT_TIME = { A: '06:00 – 14:30', B: '14:30 – 22:30', C: '22:30 – 06:00' }
+const EMPTY_SHIFT = { oldLine: 0, newLine: 0, testCell: 0, paintLine: 0, fes: 0, shipped: 0 }
+
 const ShiftCard = ({ shift, data }) => (
   <div className="shift-card">
-    <div className="shift-header">Shift {shift}</div>
+    <div className="shift-header">
+      <span>Shift {shift}</span>
+      <span className="shift-time">{SHIFT_TIME[shift]}</span>
+    </div>
     <div className="shift-grid">
-      <div className="shift-row"><span>WS 33200</span><strong>{data.ws33200}</strong></div>
-      <div className="shift-row"><span>WS 23800</span><strong>{data.ws23800}</strong></div>
+      <div className="shift-row"><span>Old Line</span><strong>{data.oldLine}</strong></div>
+      <div className="shift-row"><span>New Line</span><strong>{data.newLine}</strong></div>
       <div className="shift-row"><span>Test Cell</span><strong>{data.testCell}</strong></div>
-      <div className="shift-row"><span>Rework</span><strong>{data.rework}</strong></div>
-      <div className="shift-row"><span>Engines</span><strong>{data.engines}</strong></div>
-      <div className="shift-row"><span>Events</span><strong>{data.events}</strong></div>
+      <div className="shift-row"><span>Paint Line</span><strong>{data.paintLine}</strong></div>
+      <div className="shift-row"><span>FES</span><strong>{data.fes}</strong></div>
+      <div className="shift-row"><span>Shipped</span><strong>{data.shipped}</strong></div>
     </div>
   </div>
 )
 
-const EMPTY_SHIFT = { ws33200: 0, ws23800: 0, testCell: 0, rework: 0, engines: 0, events: 0 }
+const fmtDate = (iso) =>
+  iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
+
+// yyyy-MM-dd mein n din add/subtract (timezone-safe - sirf local date parts,
+// toISOString() UTC mein shift kar deta tha jisse IST +5:30 mein +-1 galat ho jaata).
+const addDays = (iso, n) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + n)
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
+}
+
+// Series colors - KPI cards ke saath consistent (Old=green, New=blue, Test=orange)
+const LINE_COLORS = { oldLine: '#4CAF50', newLine: '#2196F3', testCell: '#FF9800' }
+
+// Teeno charts (hourly/daily/monthly) ek hi shape - O Line, N Line, T Line.
+const ProdChart = ({ data, xKey, xLabel }) => (
+  <ResponsiveContainer width="100%" height={300}>
+    <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: xLabel ? 6 : 0 }}>
+      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+      <XAxis
+        dataKey={xKey}
+        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+        {...(xLabel ? { label: { value: xLabel, position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 } } : {})}
+      />
+      <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
+      <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
+      <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+      <Bar dataKey="oldLine"  name="Old Line"  fill={LINE_COLORS.oldLine}  radius={[3, 3, 0, 0]} isAnimationActive={false} />
+      <Bar dataKey="newLine"  name="New Line"  fill={LINE_COLORS.newLine}  radius={[3, 3, 0, 0]} isAnimationActive={false} />
+      <Bar dataKey="testCell" name="Test Cell" fill={LINE_COLORS.testCell} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+    </BarChart>
+  </ResponsiveContainer>
+)
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('hourly')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedDate, setSelectedDate] = useState(null) // null = latest day (server decides)
 
-  useEffect(() => {
-    api.get('/Dashboard/overview')
-      .then(res => setData(res.data))
-      .catch(() => setError('Backend se data nahi mila. Kya server localhost:5000 pe chal raha hain?'))
+  const load = useCallback((date) => {
+    return api.get('/Dashboard/overview', { params: date ? { date } : {} })
+      .then(res => { setData(res.data); setError('') })
+      .catch(() => setError('Unable to load data. Please ensure the backend server is running on localhost:5000.'))
       .finally(() => setLoading(false))
   }, [])
 
-  const dateLabel = data?.date
-    ? new Date(data.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    : ''
+  // Initial load + jab date change ho.
+  useEffect(() => { load(selectedDate) }, [selectedDate, load])
 
+  // Live: har 30s pe refresh (current selected day).
+  useEffect(() => {
+    const id = setInterval(() => load(selectedDate), 30000)
+    return () => clearInterval(id)
+  }, [selectedDate, load])
+
+  const currentDay = data?.productionDay
+  const minDate = data?.minDate
+  const maxDate = data?.maxDate
+  // Date change pe poora dashboard blank nahi karte - purana data dikhta rehta hain
+  // jab tak naya (~20ms) aa jaaye. Isse charts remount nahi hote, smooth lagta hain.
+  const goTo = (d) => { if (d) setSelectedDate(d) }
+  const prevDisabled = !currentDay || !minDate || currentDay <= minDate
+  const nextDisabled = !currentDay || !maxDate || currentDay >= maxDate
+  const prev = () => !prevDisabled && goTo(addDays(currentDay, -1))
+  const next = () => !nextDisabled && goTo(addDays(currentDay, 1))
+
+  const dateLabel = fmtDate(currentDay)
   const kpis = data?.kpis
   const shifts = data?.shifts || { a: EMPTY_SHIFT, b: EMPTY_SHIFT, c: EMPTY_SHIFT }
   const hourly = data?.hourly || []
   const daily = data?.daily || []
+  const monthly = data?.monthly || []
 
   return (
     <div className="dash-root">
@@ -65,6 +124,21 @@ export default function Dashboard() {
             <span className="dash-date">{dateLabel}</span>
           </div>
           <div className="dash-topbar-right">
+            {/* Date navigation - calendar (DB ke range tak) */}
+            {currentDay && (
+              <div className="date-nav">
+                <button className="date-arrow" onClick={prev} disabled={prevDisabled} title="Previous day">‹</button>
+                <input
+                  type="date"
+                  className="date-select"
+                  value={currentDay}
+                  min={minDate}
+                  max={maxDate}
+                  onChange={e => goTo(e.target.value)}
+                />
+                <button className="date-arrow" onClick={next} disabled={nextDisabled} title="Next day">›</button>
+              </div>
+            )}
             <span className="dash-live-dot" />
             <span className="dash-live-text">Live</span>
           </div>
@@ -75,16 +149,24 @@ export default function Dashboard() {
           {loading && <div className="section-title">Loading…</div>}
           {error && <div className="section-title" style={{ color: '#EF7A70' }}>{error}</div>}
 
-          {!loading && !error && kpis && (
+          {/* Selected date pe DB mein koi record nahi */}
+          {!loading && !error && data && !data.hasData && (
+            <div className="no-data-panel">
+              <div className="no-data-icon">🗓️</div>
+              <div className="no-data-title">No data available for this date</div>
+              <div className="no-data-sub">No production records were found for {dateLabel}. Please select another date from the calendar.</div>
+            </div>
+          )}
+
+          {!loading && !error && data?.hasData && kpis && (
             <>
               {/* KPI Cards */}
               <div className="kpi-row">
-                <KPICard label="Engines Today"  value={kpis.enginesToday}  sub="assembly"   color="#4CAF50" />
-                <KPICard label="Events Today"   value={kpis.eventsToday}    sub="scans"      color="#2196F3" />
-                <KPICard label="In Test Cell"   value={kpis.inTestCell}     sub="today"      color="#FF9800" />
-                <KPICard label="Unique Serials" value={kpis.uniqueSerialsAll} sub="all time" color="#9C27B0" />
-                <KPICard label="Workstations"   value={kpis.workstations}   sub="active"     color="#F44336" />
-                <KPICard label="Total Records"  value={kpis.totalRecords.toLocaleString('en-IN')} sub="in DB" color="#00BCD4" />
+                <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" />
+                <KPICard label="New Line QTY"  value={kpis.newLine}   sub="assembly"   color="#2196F3" />
+                <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" />
+                <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" />
+                <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" />
               </div>
 
               {/* Shift Summary */}
@@ -95,43 +177,39 @@ export default function Dashboard() {
                 <ShiftCard shift="C" data={shifts.c} />
               </div>
 
-              {/* Charts */}
+              {/* Charts - har chart mein O Line, N Line, T Line */}
               <div className="section-title">Production Charts</div>
               <div className="chart-tabs">
                 <button className={`chart-tab ${activeTab === 'hourly' ? 'active' : ''}`} onClick={() => setActiveTab('hourly')}>Hourly</button>
                 <button className={`chart-tab ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => setActiveTab('daily')}>Daily</button>
+                <button className={`chart-tab ${activeTab === 'monthly' ? 'active' : ''}`} onClick={() => setActiveTab('monthly')}>Monthly</button>
               </div>
 
               <div className="chart-box">
                 {activeTab === 'hourly' && (
                   <>
-                    <div className="chart-heading">Hourly Engines — {dateLabel}</div>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={hourly} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                        <XAxis dataKey="hour" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} label={{ value: 'Hour', position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} />
-                        <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                        <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                        <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                        <Bar dataKey="ws33200" name="WS 33200" fill="#2196F3" radius={[4,4,0,0]} />
-                        <Bar dataKey="ws23800" name="WS 23800" fill="#FF9800" radius={[4,4,0,0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <div className="chart-heading">Hourly Engines — {dateLabel} (00:30 to 00:30)</div>
+                    {hourly.length === 0
+                      ? <div className="chart-empty">No hourly data available for this date.</div>
+                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour" />}
                   </>
                 )}
 
                 {activeTab === 'daily' && (
                   <>
-                    <div className="chart-heading">Daily Engines Produced</div>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={daily} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                        <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                        <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                        <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-                        <Bar dataKey="engines" name="Engines" fill="#4CAF50" radius={[4,4,0,0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <div className="chart-heading">Daily Engines (per production day)</div>
+                    {daily.length === 0
+                      ? <div className="chart-empty">No daily data available.</div>
+                      : <ProdChart data={daily} xKey="date" />}
+                  </>
+                )}
+
+                {activeTab === 'monthly' && (
+                  <>
+                    <div className="chart-heading">Monthly Engines (per month)</div>
+                    {monthly.length === 0
+                      ? <div className="chart-empty">No monthly data available.</div>
+                      : <ProdChart data={monthly} xKey="month" />}
                   </>
                 )}
               </div>

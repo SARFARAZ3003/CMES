@@ -14,13 +14,14 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<CmesDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("CMES_DB")));
 
-//CORS - React(port 5173) ko allow karo
+//CORS - koi bhi localhost port (Vite kabhi 5173, kabhi 5174 leta hain) allow karo
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
+            policy.SetIsOriginAllowed(origin =>
+                      new Uri(origin).Host is "localhost" or "127.0.0.1")
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });

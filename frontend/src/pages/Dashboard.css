@@ -39,7 +39,81 @@
 .dash-topbar-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+}
+
+/* Date navigation */
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-arrow {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.date-arrow:hover:not(:disabled) {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+}
+
+.date-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.date-select {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color-scheme: dark; /* native calendar picker dark theme */
+  font-family: inherit;
+}
+
+.date-select::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+}
+
+/* No-data panel */
+.no-data-panel {
+  background: #1a1a1a;
+  border: 1px dashed rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.no-data-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.no-data-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.no-data-sub {
+  color: rgba(255,255,255,0.45);
+  font-size: 13px;
 }
 
 .dash-live-dot {
@@ -71,7 +145,7 @@
 /* KPI Cards */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -136,7 +210,26 @@
   font-weight: 500;
   padding: 8px 14px;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
+.shift-time {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.8;
+  letter-spacing: 0;
+}
+
+.shift-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.shift-total span { color: rgba(255,255,255,0.7); }
+.shift-total strong { color: #4CAF50; }
 
 .shift-grid {
   padding: 10px 14px;
@@ -204,4 +297,11 @@
   margin-bottom: 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.chart-empty {
+  color: rgba(255,255,255,0.3);
+  font-size: 13px;
+  padding: 40px 0;
+  text-align: center;
 }
