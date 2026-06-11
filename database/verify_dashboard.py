@@ -13,29 +13,37 @@ Run:  python verify_dashboard.py
 import json
 import urllib.request
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, time
 
 import openpyxl
 
 EXCEL = r"C:\Users\Sarfaraz\Downloads\PROD.xlsx"
 API = "http://localhost:5000/api/Dashboard/overview"
+API_TRENDS = "http://localhost:5000/api/Dashboard/trends"
 
 OLD_LINE = "23800"   # Old Line
 NEW_LINE = "33200"   # New Line
 TEST_CELL = "TEST CELL LINE"
 
+# DB UTC mein hai. IST = UTC + 5:30. Shift/hour IST pe.
+IST = timedelta(hours=5, minutes=30)
+
+
+def to_ist(t):
+    return t + IST
+
 
 # ---- methodology (backend ke bilkul same) ----
-# Production day = sir ki query jaisa: 00:30 se agle din 00:30 (30 min peeche karke date).
+# Business day = IST 06:00 -> 06:00. UTC se 30 min peeche karke date (= sir ka 00:30 UTC boundary).
 def prod_day(t):
     return (t - timedelta(minutes=30)).date()
 
 
 def shift_of(t):
-    tod = t.time()
-    if tod >= __import__("datetime").time(6, 0) and tod < __import__("datetime").time(14, 30):
+    tod = to_ist(t).time()   # IST mein convert karke shift nikalo
+    if tod >= time(6, 0) and tod < time(14, 30):
         return "A"
-    if tod >= __import__("datetime").time(14, 30) and tod < __import__("datetime").time(22, 30):
+    if tod >= time(14, 30) and tod < time(22, 30):
         return "B"
     return "C"
 
@@ -113,13 +121,13 @@ def main():
         exp_hours = defaultdict(lambda: [0, 0, 0])  # hour -> [old, new, test]
         for t in old_firsts:
             if in_day(t):
-                exp_hours[t.hour][0] += 1
+                exp_hours[to_ist(t).hour][0] += 1
         for t in new_firsts:
             if in_day(t):
-                exp_hours[t.hour][1] += 1
+                exp_hours[to_ist(t).hour][1] += 1
         for t in tc_firsts:
             if in_day(t):
-                exp_hours[t.hour][2] += 1
+                exp_hours[to_ist(t).hour][2] += 1
         exp_hours = {h: v for h, v in exp_hours.items() if any(v)}
         api_hours = {int(x["hour"][:2]): [x["oldLine"], x["newLine"], x["testCell"]]
                      for x in api_data["hourly"] if x["oldLine"] or x["newLine"] or x["testCell"]}
@@ -131,19 +139,22 @@ def main():
         tot_new = sum(api_data['shifts'][s]['newLine'] for s in 'abc')
         print(f"  {d}  Old={exp_old:>4} New={exp_new:>4} Test={exp_tc:>4}  | A/B/C new={api_data['shifts']['a']['newLine']}/{api_data['shifts']['b']['newLine']}/{api_data['shifts']['c']['newLine']} (sum={tot_new})  OK")
 
-    # ---- Daily + Monthly charts (ek response se - sabme same aata hain) ----
-    with urllib.request.urlopen(f"{API}?date={days[-1].isoformat()}", timeout=10) as resp:
-        api_data = json.load(resp)
+    # ---- Daily + Monthly charts (alag /trends endpoint se) ----
+    with urllib.request.urlopen(API_TRENDS, timeout=20) as resp:
+        trends = json.load(resp)
 
-    # Daily
-    exp_daily = {}
+    # Daily = sirf new-engine wale din (count>0), last 30
+    active = []
     for d in days:
-        exp_daily[d.strftime("%d %b")] = [
+        v = [
             sum(1 for t in old_firsts if prod_day(t) == d),
             sum(1 for t in new_firsts if prod_day(t) == d),
             sum(1 for t in tc_firsts if prod_day(t) == d),
         ]
-    api_daily = {x["date"]: [x["oldLine"], x["newLine"], x["testCell"]] for x in api_data["daily"]}
+        if any(v):
+            active.append((d, v))
+    exp_daily = {d.strftime("%d %b"): v for d, v in active[-30:]}
+    api_daily = {x["date"]: [x["oldLine"], x["newLine"], x["testCell"]] for x in trends["daily"]}
     checks += 1
     if exp_daily != api_daily:
         fails += 1
@@ -160,7 +171,7 @@ def main():
     for t in tc_firsts:
         exp_monthly[prod_day(t).strftime("%b %Y")][2] += 1
     exp_monthly = dict(exp_monthly)
-    api_monthly = {x["month"]: [x["oldLine"], x["newLine"], x["testCell"]] for x in api_data["monthly"]}
+    api_monthly = {x["month"]: [x["oldLine"], x["newLine"], x["testCell"]] for x in trends["monthly"]}
     checks += 1
     if exp_monthly != api_monthly:
         fails += 1

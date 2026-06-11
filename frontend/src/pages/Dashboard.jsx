@@ -77,6 +77,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedDate, setSelectedDate] = useState(null) // null = latest day (server decides)
+  const [trends, setTrends] = useState({ daily: [], monthly: [] })
 
   const load = useCallback((date) => {
     return api.get('/Dashboard/overview', { params: date ? { date } : {} })
@@ -88,29 +89,43 @@ export default function Dashboard() {
   // Initial load + jab date change ho.
   useEffect(() => { load(selectedDate) }, [selectedDate, load])
 
-  // Live: har 30s pe refresh (current selected day).
+  // Live: har 30s pe refresh (sirf selected-din ka overview - fast).
   useEffect(() => {
     const id = setInterval(() => load(selectedDate), 30000)
     return () => clearInterval(id)
   }, [selectedDate, load])
 
+  // Trends (daily + monthly) heavy hain (poori history) - sirf ek baar page load pe,
+  // live 30s refresh pe nahi. Isse 5-crore data pe bhi dashboard fast rehta hain.
+  useEffect(() => {
+    api.get('/Dashboard/trends').then(res => setTrends(res.data)).catch(() => {})
+  }, [])
+
   const currentDay = data?.productionDay
   const minDate = data?.minDate
   const maxDate = data?.maxDate
-  // Date change pe poora dashboard blank nahi karte - purana data dikhta rehta hain
-  // jab tak naya (~20ms) aa jaaye. Isse charts remount nahi hote, smooth lagta hain.
+  // Navigation 'selectedDate' (turant intent) pe based hain - currentDay (server echo)
+  // async aata hain to uspe depend karne se rapid clicks race kar jaate the (+2/stuck bug).
+  // Pehli load pe selectedDate null -> currentDay (latest) se chalu.
+  const effDate = selectedDate || currentDay
   const goTo = (d) => { if (d) setSelectedDate(d) }
-  const prevDisabled = !currentDay || !minDate || currentDay <= minDate
-  const nextDisabled = !currentDay || !maxDate || currentDay >= maxDate
-  const prev = () => !prevDisabled && goTo(addDays(currentDay, -1))
-  const next = () => !nextDisabled && goTo(addDays(currentDay, 1))
+  const prevDisabled = !effDate || !minDate || effDate <= minDate
+  const nextDisabled = !effDate || !maxDate || effDate >= maxDate
+  const prev = () => !prevDisabled && goTo(addDays(effDate, -1))
+  const next = () => !nextDisabled && goTo(addDays(effDate, 1))
 
-  const dateLabel = fmtDate(currentDay)
+  const dateLabel = fmtDate(effDate)
   const kpis = data?.kpis
   const shifts = data?.shifts || { a: EMPTY_SHIFT, b: EMPTY_SHIFT, c: EMPTY_SHIFT }
   const hourly = data?.hourly || []
-  const daily = data?.daily || []
-  const monthly = data?.monthly || []
+  const daily = trends?.daily || []
+  const monthly = trends?.monthly || []
+  // Shift chart - shifts object ko 3 bars (A/B/C) mein badal do, har bar mein O/N/T.
+  const shiftChart = [
+    { name: 'Shift A', ...shifts.a },
+    { name: 'Shift B', ...shifts.b },
+    { name: 'Shift C', ...shifts.c },
+  ]
 
   return (
     <div className="dash-root">
@@ -125,13 +140,13 @@ export default function Dashboard() {
           </div>
           <div className="dash-topbar-right">
             {/* Date navigation - calendar (DB ke range tak) */}
-            {currentDay && (
+            {effDate && (
               <div className="date-nav">
                 <button className="date-arrow" onClick={prev} disabled={prevDisabled} title="Previous day">‹</button>
                 <input
                   type="date"
                   className="date-select"
-                  value={currentDay}
+                  value={effDate}
                   min={minDate}
                   max={maxDate}
                   onChange={e => goTo(e.target.value)}
@@ -181,6 +196,7 @@ export default function Dashboard() {
               <div className="section-title">Production Charts</div>
               <div className="chart-tabs">
                 <button className={`chart-tab ${activeTab === 'hourly' ? 'active' : ''}`} onClick={() => setActiveTab('hourly')}>Hourly</button>
+                <button className={`chart-tab ${activeTab === 'shift' ? 'active' : ''}`} onClick={() => setActiveTab('shift')}>Shift</button>
                 <button className={`chart-tab ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => setActiveTab('daily')}>Daily</button>
                 <button className={`chart-tab ${activeTab === 'monthly' ? 'active' : ''}`} onClick={() => setActiveTab('monthly')}>Monthly</button>
               </div>
@@ -188,10 +204,17 @@ export default function Dashboard() {
               <div className="chart-box">
                 {activeTab === 'hourly' && (
                   <>
-                    <div className="chart-heading">Hourly Engines — {dateLabel} (00:30 to 00:30)</div>
+                    <div className="chart-heading">Hourly Engines — {dateLabel} (06:00 to 06:00 IST)</div>
                     {hourly.length === 0
                       ? <div className="chart-empty">No hourly data available for this date.</div>
-                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour" />}
+                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour (IST)" />}
+                  </>
+                )}
+
+                {activeTab === 'shift' && (
+                  <>
+                    <div className="chart-heading">Shift-wise Engines — {dateLabel}</div>
+                    <ProdChart data={shiftChart} xKey="name" />
                   </>
                 )}
 
