@@ -8,11 +8,15 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//SQL Server connect - localhost, CMES_DB, Windows Auth (Trusted_Connection)
-//Connection string appsettings.json mein hain. Abhi controllers mock data dete hain,
-//par DbContext register ho gaya - DB ready hote hi use kar sakte hain.
-builder.Services.AddDbContext<CmesDbContext>(options =>
+//SQL Server connect (appsettings.json -> CMES_DB).
+//DbContextFactory: dashboard kai queries PARALLEL chalata hain - har query ka apna
+//short-lived context chahiye (ek context thread-safe nahi hota). Isse bade DB pe
+//latency = sabse dheere query, na ki sabka jod.
+builder.Services.AddPooledDbContextFactory<CmesDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("CMES_DB")));
+
+//Calendar range + trends ko cache karne ke liye (baar-baar heavy recompute na ho).
+builder.Services.AddMemoryCache();
 
 //CORS - koi bhi localhost port (Vite kabhi 5173, kabhi 5174 leta hain) allow karo
 builder.Services.AddCors(options =>
