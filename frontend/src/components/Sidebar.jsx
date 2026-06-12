@@ -1,9 +1,11 @@
 import './Sidebar.css'
 
-// Single-page dashboard - sidebar sirf branding + active item dikhata hain.
-const user = { name: 'Sarfaraz Ahmed', code: 'OD741', shift: 'A' }
+// User aata hain Windows Integrated Auth se (/api/auth/me).
+export default function Sidebar({ user, onLogout }) {
+  const name = user?.fullName || user?.username || 'User'
+  const username = user?.username || ''
+  const role = user?.role || ''
 
-export default function Sidebar() {
   return (
     <div className="sidebar">
       {/* Header */}
@@ -14,10 +16,12 @@ export default function Sidebar() {
 
       {/* User Info */}
       <div className="sidebar-user">
-        <div className="sidebar-avatar">{user.name.charAt(0)}</div>
+        <div className="sidebar-avatar">{name.charAt(0).toUpperCase()}</div>
         <div className="sidebar-user-info">
-          <div className="sidebar-user-name">{user.name}</div>
-          <div className="sidebar-user-meta">{user.code} · Shift {user.shift}</div>
+          <div className="sidebar-user-name">{name}</div>
+          <div className="sidebar-user-meta">
+            {username}{role ? ` · ${role}` : ''}
+          </div>
         </div>
       </div>
 
@@ -31,6 +35,12 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="sidebar-footer">
+        {onLogout && (
+          <button className="sidebar-logout" onClick={onLogout}>
+            <span className="sidebar-icon">🚪</span>
+            <span>Log Out</span>
+          </button>
+        )}
         <div className="sidebar-version">TCL CMES v2.0</div>
       </div>
     </div>

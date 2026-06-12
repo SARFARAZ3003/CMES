@@ -17,5 +17,8 @@ namespace CMES.Data
         // FES: dbo.MPI_COB_T_TRANSACTION_OUTBOUND  ⨝  dbo.MPI_COB_T_SERIAL_NO
         public DbSet<TransactionOutbound> TransactionOutbound => Set<TransactionOutbound>();
         public DbSet<SerialMaster> SerialNo => Set<SerialMaster>();
+
+        // Authorization: dbo.CMES_USERS (Windows Integrated Auth)
+        public DbSet<CmesUser> Users => Set<CmesUser>();
     }
 }

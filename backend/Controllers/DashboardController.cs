@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using CMES.Data;
@@ -7,6 +8,7 @@ namespace CMES.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CmesUser")]   // sirf active CMES user dashboard data dekh sakta hain
     public class DashboardController : ControllerBase
     {
         // Factory: har query apna context banata hain -> parallel chal sakti hain.
@@ -190,26 +192,26 @@ namespace CMES.Controllers
         private async Task<List<DayCount>> PerDayNewEngines(CmesDbContext db, string ws)
         {
             var sql = @"
-SELECT CAST(DATEADD(MINUTE,-30, f.FirstOn) AS DATE) AS BizDay, COUNT(*) AS Cnt
-FROM (
-    SELECT SERIALNO, MIN(CREATEDON) AS FirstOn
-    FROM MPI_COB_T_SERIAL_NO_HISTORY
-    WHERE WORKSTATION = {0} AND SERIALNO IS NOT NULL
-    GROUP BY SERIALNO
-) f
-GROUP BY CAST(DATEADD(MINUTE,-30, f.FirstOn) AS DATE)
-ORDER BY BizDay";
+            SELECT CAST(DATEADD(MINUTE,-30, f.FirstOn) AS DATE) AS BizDay, COUNT(*) AS Cnt
+            FROM (
+                SELECT SERIALNO, MIN(CREATEDON) AS FirstOn
+                FROM MPI_COB_T_SERIAL_NO_HISTORY
+                WHERE WORKSTATION = {0} AND SERIALNO IS NOT NULL
+                GROUP BY SERIALNO
+            ) f
+            GROUP BY CAST(DATEADD(MINUTE,-30, f.FirstOn) AS DATE)
+            ORDER BY BizDay";
             return await db.Database.SqlQueryRaw<DayCount>(sql, ws).ToListAsync();
         }
 
         private async Task<List<DayCount>> PerDayTestCell(CmesDbContext db)
         {
             var sql = @"
-SELECT CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE) AS BizDay, COUNT(*) AS Cnt
-FROM COB_T_AMI_CAPTURE_LOG
-WHERE WORKSTATION = {0}
-GROUP BY CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE)
-ORDER BY BizDay";
+            SELECT CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE) AS BizDay, COUNT(*) AS Cnt
+            FROM COB_T_AMI_CAPTURE_LOG
+            WHERE WORKSTATION = {0}
+            GROUP BY CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE)
+            ORDER BY BizDay";
             return await db.Database.SqlQueryRaw<DayCount>(sql, TEST_CELL_WS).ToListAsync();
         }
 

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
 import api from '../api/client'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import './Dashboard.css'
@@ -51,28 +51,46 @@ const addDays = (iso, n) => {
 // Series colors - KPI cards ke saath consistent (Old=green, New=blue, Test=orange)
 const LINE_COLORS = { oldLine: '#4CAF50', newLine: '#2196F3', testCell: '#FF9800' }
 
-// Teeno charts (hourly/daily/monthly) ek hi shape - O Line, N Line, T Line.
-const ProdChart = ({ data, xKey, xLabel }) => (
-  <ResponsiveContainer width="100%" height={300}>
-    <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: xLabel ? 6 : 0 }}>
-      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-      <XAxis
-        dataKey={xKey}
-        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
-        {...(xLabel ? { label: { value: xLabel, position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 } } : {})}
-      />
-      <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-      <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
-      <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-      <Bar dataKey="oldLine"  name="Old Line"  fill={LINE_COLORS.oldLine}  radius={[3, 3, 0, 0]} isAnimationActive={false} />
-      <Bar dataKey="newLine"  name="New Line"  fill={LINE_COLORS.newLine}  radius={[3, 3, 0, 0]} isAnimationActive={false} />
-      <Bar dataKey="testCell" name="Test Cell" fill={LINE_COLORS.testCell} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-    </BarChart>
-  </ResponsiveContainer>
-)
+const SERIES = [
+  { key: 'oldLine', name: 'Old Line', color: LINE_COLORS.oldLine },
+  { key: 'newLine', name: 'New Line', color: LINE_COLORS.newLine },
+  { key: 'testCell', name: 'Test Cell', color: LINE_COLORS.testCell },
+]
 
-export default function Dashboard() {
+// Reusable chart - 3 series (O/N/T). type='line' ya 'bar' (toggle se).
+const ProdChart = ({ data, xKey, xLabel, type = 'bar', height = 300 }) => {
+  const Chart = type === 'line' ? LineChart : BarChart
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <Chart data={data} margin={{ top: 10, right: 20, left: 0, bottom: xLabel ? 6 : 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+        <XAxis
+          dataKey={xKey}
+          tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+          {...(xLabel ? { label: { value: xLabel, position: 'insideBottom', offset: -2, fill: 'rgba(255,255,255,0.3)', fontSize: 11 } } : {})}
+        />
+        <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
+        <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
+        <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+        {SERIES.map(s => type === 'line'
+          ? <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={false} isAnimationActive={false} />
+          : <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+        )}
+      </Chart>
+    </ResponsiveContainer>
+  )
+}
+
+// Kaunse hours kis shift mein (IST). Per-shift hourly graph ke liye.
+const SHIFT_HOURS = {
+  A: [6, 7, 8, 9, 10, 11, 12, 13],
+  B: [14, 15, 16, 17, 18, 19, 20, 21],
+  C: [22, 23, 0, 1, 2, 3, 4, 5],
+}
+
+export default function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('hourly')
+  const [chartType, setChartType] = useState('line') // 'line' | 'bar' - sab graphs pe
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -120,16 +138,12 @@ export default function Dashboard() {
   const hourly = data?.hourly || []
   const daily = trends?.daily || []
   const monthly = trends?.monthly || []
-  // Shift chart - shifts object ko 3 bars (A/B/C) mein badal do, har bar mein O/N/T.
-  const shiftChart = [
-    { name: 'Shift A', ...shifts.a },
-    { name: 'Shift B', ...shifts.b },
-    { name: 'Shift C', ...shifts.c },
-  ]
+  // Per-shift hourly: hourly array ko us shift ke hours pe filter karo.
+  const hourlyFor = (sh) => hourly.filter(h => SHIFT_HOURS[sh].includes(parseInt(h.hour, 10)))
 
   return (
     <div className="dash-root">
-      <Sidebar />
+      <Sidebar user={user} onLogout={onLogout} />
       <div className="dash-main">
 
         {/* Top Bar */}
@@ -199,6 +213,12 @@ export default function Dashboard() {
                 <button className={`chart-tab ${activeTab === 'shift' ? 'active' : ''}`} onClick={() => setActiveTab('shift')}>Shift</button>
                 <button className={`chart-tab ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => setActiveTab('daily')}>Daily</button>
                 <button className={`chart-tab ${activeTab === 'monthly' ? 'active' : ''}`} onClick={() => setActiveTab('monthly')}>Monthly</button>
+
+                {/* Line / Bar toggle - sab graphs pe lagta hain */}
+                <div className="chart-type-toggle">
+                  <button className={chartType === 'line' ? 'active' : ''} onClick={() => setChartType('line')}>Line</button>
+                  <button className={chartType === 'bar' ? 'active' : ''} onClick={() => setChartType('bar')}>Bar</button>
+                </div>
               </div>
 
               <div className="chart-box">
@@ -207,14 +227,22 @@ export default function Dashboard() {
                     <div className="chart-heading">Hourly Engines — {dateLabel} (06:00 to 06:00 IST)</div>
                     {hourly.length === 0
                       ? <div className="chart-empty">No hourly data available for this date.</div>
-                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour (IST)" />}
+                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour (IST)" type={chartType} />}
                   </>
                 )}
 
+                {/* Shift tab - har shift (A/B/C) ka alag graph (us shift ke hours) */}
                 {activeTab === 'shift' && (
                   <>
-                    <div className="chart-heading">Shift-wise Engines — {dateLabel}</div>
-                    <ProdChart data={shiftChart} xKey="name" />
+                    <div className="chart-heading">Shift-wise Hourly Engines — {dateLabel}</div>
+                    {['A', 'B', 'C'].map(sh => (
+                      <div key={sh} className="shift-graph-block">
+                        <div className="shift-graph-title">Shift {sh} <span>{SHIFT_TIME[sh]}</span></div>
+                        {hourlyFor(sh).length === 0
+                          ? <div className="chart-empty">No engines in Shift {sh}.</div>
+                          : <ProdChart data={hourlyFor(sh)} xKey="hour" type={chartType} height={210} />}
+                      </div>
+                    ))}
                   </>
                 )}
 
@@ -223,7 +251,7 @@ export default function Dashboard() {
                     <div className="chart-heading">Daily Engines (per production day)</div>
                     {daily.length === 0
                       ? <div className="chart-empty">No daily data available.</div>
-                      : <ProdChart data={daily} xKey="date" />}
+                      : <ProdChart data={daily} xKey="date" type={chartType} />}
                   </>
                 )}
 
@@ -232,7 +260,7 @@ export default function Dashboard() {
                     <div className="chart-heading">Monthly Engines (per month)</div>
                     {monthly.length === 0
                       ? <div className="chart-empty">No monthly data available.</div>
-                      : <ProdChart data={monthly} xKey="month" />}
+                      : <ProdChart data={monthly} xKey="month" type={chartType} />}
                   </>
                 )}
               </div>

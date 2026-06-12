@@ -1,0 +1,97 @@
+.login-root {
+  min-height: 100vh;
+  background: #111;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar - TCL MANUFACTURING EXECUTION SYSTEM (legacy jaisa) */
+.login-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 28px;
+  background: #1a1a1a;
+}
+.login-logo {
+  background: #8B0000;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.login-sys {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+.login-accent {
+  height: 4px;
+  background: linear-gradient(90deg, #8B0000, #c1121f);
+}
+
+/* Body */
+.login-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.login-card {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 28px 40px;
+}
+
+.login-avatar {
+  font-size: 52px;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+}
+
+.login-detail { display: flex; flex-direction: column; gap: 14px; }
+
+.login-username {
+  color: rgba(255,255,255,0.7);
+  font-size: 15px;
+}
+.login-username span {
+  color: #EF7A70;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.login-btn {
+  align-self: flex-start;
+  background: #8B0000;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.login-btn:hover:not(:disabled) { background: #a30f1c; }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.login-hint {
+  color: rgba(255,255,255,0.3);
+  font-size: 12px;
+}

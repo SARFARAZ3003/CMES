@@ -289,6 +289,48 @@
   color: #fff;
 }
 
+/* Line / Bar toggle */
+.chart-type-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.chart-type-toggle button {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chart-type-toggle button:hover { color: rgba(255,255,255,0.85); }
+.chart-type-toggle button.active {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
+/* Per-shift graph blocks (Shift tab) */
+.shift-graph-block {
+  margin-bottom: 18px;
+}
+.shift-graph-block:last-child { margin-bottom: 0; }
+
+.shift-graph-title {
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.shift-graph-title span {
+  color: rgba(255,255,255,0.35);
+  font-size: 11px;
+  margin-left: 8px;
+}
+
 /* Chart Box */
 .chart-box {
   background: #1a1a1a;
