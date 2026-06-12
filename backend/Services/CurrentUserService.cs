@@ -7,13 +7,14 @@ namespace CMES.Services
     public record CmesUserInfo(string Username, string? FullName, string Role);
 
     // Windows identity -> WWID -> CMES_USERS lookup. Scoped service.
+    // AuthDbContext use karta hain (CMES_USERS alag AUTH_DB mein hain).
     public class CurrentUserService
     {
-        private readonly IDbContextFactory<CmesDbContext> _factory;
+        private readonly IDbContextFactory<AuthDbContext> _factory;
         private readonly IHttpContextAccessor _http;
         private readonly IWebHostEnvironment _env;
 
-        public CurrentUserService(IDbContextFactory<CmesDbContext> factory,
+        public CurrentUserService(IDbContextFactory<AuthDbContext> factory,
                                   IHttpContextAccessor http, IWebHostEnvironment env)
         {
             _factory = factory;

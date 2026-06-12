@@ -34,6 +34,10 @@ builder.Services.AddPooledDbContextFactory<CmesDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("CMES_DB"),
         sql => sql.CommandTimeout(180)));  // bade DB pe heavy trends query 30s pe cancel na ho
 
+//Auth ke liye ALAG database (CMES_USERS). Sir ke setup mein ye production DB se alag hain.
+builder.Services.AddPooledDbContextFactory<AuthDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("AUTH_DB")));
+
 //Calendar range + trends ko cache karne ke liye (baar-baar heavy recompute na ho).
 builder.Services.AddMemoryCache();
 

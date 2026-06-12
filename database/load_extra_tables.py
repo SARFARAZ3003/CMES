@@ -1,18 +1,18 @@
 """
-TestCell / Paint / FES ke liye 3 extra tables FlexNet DB mein load karta hain.
-Sirf zaroori columns (dashboard queries ke liye) - sample xlsx se.
-
-  COB_T_AMI_CAPTURE_LOG        (Test Cell - ws 40200)
-  MPI_COB_T_SERIAL_NO          (FES join - WORKORDERNO/SERIALNO/STATUS)
-  MPI_COB_T_TRANSACTION_OUTBOUND (FES - WIPJOBNO/OVERALLSTATUS/CREATEDON)
-
-SQL generate karke sqlcmd se chalata hain. Run:
-    python load_extra_tables.py
+#############################################################################
+# ⚠️  LOCAL TEST DB ONLY — PRODUCTION / REAL COMPANY DB PE KABHI MAT CHALAO! #
+# Ye script in tables ko pehle DROP karta hain phir slim sample bana deta:   #
+#   COB_T_AMI_CAPTURE_LOG, MPI_COB_T_SERIAL_NO, MPI_COB_T_TRANSACTION_OUTBOUND#
+# Real DB pe in tables mein CRORES rows hain - chalaya to wo UD jaayega.     #
+# Real DB pe ye tables already maujood hain; sirf connection string point    #
+# karna hain, kuch load NAHI karna. Ye sirf hamare local FlexNet DB ke liye. #
+#############################################################################
 """
 import os
 import subprocess
 import openpyxl
 
+DB = "FlexNet"  # SAFETY: sirf local test DB. Real DB ka naam yahan kabhi mat daalo.
 DL = r"C:\Users\Sarfaraz\Downloads"
 OUT = os.path.join(os.path.dirname(__file__), "_extra_tables.sql")
 
@@ -51,6 +51,12 @@ def fmt(v, kind):
 
 
 def main():
+    # SAFETY GUARD: real/production DB pe galti se chal gaya to tables UD jaate.
+    if DB.strip().lower() != "flexnet":
+        raise SystemExit(
+            f"REFUSING TO RUN: DB='{DB}'. Ye script sirf local 'FlexNet' test DB ke liye hain. "
+            "Real DB pe chalana = tables DROP. Connection string sirf app ke liye badlo, ye script nahi.")
+
     with open(OUT, "w", encoding="utf-8") as f:
         f.write("SET NOCOUNT ON;\n\n")
         for table, xlsx, sheet, cols in TABLES:
@@ -79,7 +85,7 @@ def main():
 
     print("Running sqlcmd ...")
     res = subprocess.run(
-        ["sqlcmd", "-S", "localhost", "-d", "FlexNet", "-E", "-C", "-i", OUT],
+        ["sqlcmd", "-S", "localhost", "-d", DB, "-E", "-C", "-i", OUT],
         capture_output=True, text=True)
     print(res.stdout[-500:] if res.stdout else "")
     if res.returncode != 0:

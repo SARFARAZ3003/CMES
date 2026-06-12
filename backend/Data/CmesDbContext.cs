@@ -18,7 +18,6 @@ namespace CMES.Data
         public DbSet<TransactionOutbound> TransactionOutbound => Set<TransactionOutbound>();
         public DbSet<SerialMaster> SerialNo => Set<SerialMaster>();
 
-        // Authorization: dbo.CMES_USERS (Windows Integrated Auth)
-        public DbSet<CmesUser> Users => Set<CmesUser>();
+        // NOTE: CMES_USERS ab AuthDbContext (AUTH_DB connection) mein hain - alag database.
     }
 }
