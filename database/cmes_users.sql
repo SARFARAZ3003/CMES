@@ -19,8 +19,8 @@ GO
 -- Seed (idempotent). Username hamesha UPPERCASE.
 MERGE dbo.CMES_USERS AS t
 USING (VALUES
-    ('SARFARAZ', 'Sarfaraz Ahmed', 'Admin',    1),  -- local dev Windows user (active)
-    ('OD741',    'Sarfaraz Ahmed', 'Admin',    1),  -- WWID example (active)
+    ('SARFARAZ', 'Md. Sarfaraz Hussain', 'Admin',    1),  -- local dev Windows user (active)
+    ('OD741',    'Atul K Singh', 'Admin',    1),  -- WWID example (active)
     ('DEMOUSER', 'Demo Inactive',  'Viewer',   0)   -- inactive -> Access Denied test
 ) AS s (Username, FullName, Role, IsActive)
 ON t.Username = s.Username
