@@ -185,6 +185,25 @@
   margin-top: 4px;
 }
 
+/* vs-yesterday change badge (stocks board jaisa) */
+.kpi-change {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.3px;
+}
+.kpi-change.up { color: #4CAF50; }
+.kpi-change.down { color: #F44336; }
+.kpi-change.flat { color: rgba(255,255,255,0.25); }
+.kpi-change-sub {
+  color: rgba(255,255,255,0.3);
+  font-weight: 400;
+  font-size: 10px;
+}
+
 /* Section title */
 .section-title {
   color: rgba(255,255,255,0.4);
@@ -312,6 +331,71 @@
   background: rgba(255,255,255,0.12);
   color: #fff;
 }
+
+/* Series select/unselect checkboxes */
+.series-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+}
+.series-chk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  user-select: none;
+}
+.series-chk.on { color: rgba(255,255,255,0.85); }
+.series-chk input { cursor: pointer; accent-color: #8B0000; }
+.series-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Chart + averages side panel */
+.chart-with-avg {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.chart-area { flex: 1; min-width: 0; }
+.avg-panel {
+  width: 160px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 12px;
+  align-self: center;
+}
+.avg-title {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 6px;
+}
+.avg-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  font-size: 12px;
+}
+.avg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.avg-name { color: rgba(255,255,255,0.55); flex: 1; }
+.avg-val { color: #fff; font-weight: 600; }
 
 /* Per-shift graph blocks (Shift tab) */
 .shift-graph-block {

@@ -3,6 +3,7 @@ import api from './api/client'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AccessDenied from './pages/AccessDenied'
+import Spinner from './components/Spinner'
 import './pages/AccessDenied.css'
 
 // Flow (legacy MES jaisa):
@@ -39,7 +40,7 @@ function App() {
   // ye session reset karke phir Log In maangta hain).
   const logout = () => { setUser(null); setDenied(null); setPhase('landing') }
 
-  if (phase === 'detecting') return <div className="app-loading">Detecting Windows user…</div>
+  if (phase === 'detecting') return <Spinner full label="Detecting Windows user…" />
   if (phase === 'authorized') return <Dashboard user={user} onLogout={logout} />
   if (phase === 'denied') return <AccessDenied info={denied} />
   return <Login detected={detected} onLogin={doLogin} loading={checking} />

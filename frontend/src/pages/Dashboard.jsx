@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
+import Spinner from '../components/Spinner'
 import api from '../api/client'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -7,11 +8,24 @@ import {
 } from 'recharts'
 import './Dashboard.css'
 
-const KPICard = ({ label, value, sub, color }) => (
+// Kal se compare badge (stocks board jaisa). pct: +ve up (green), -ve down (red), null = no data.
+const ChangeBadge = ({ pct }) => {
+  if (pct === null || pct === undefined) return <div className="kpi-change flat">—</div>
+  const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
+  const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '→'
+  return (
+    <div className={`kpi-change ${cls}`}>
+      {arrow} {Math.abs(pct)}%
+    </div>
+  )
+}
+
+const KPICard = ({ label, value, sub, color, change }) => (
   <div className="kpi-card" style={{ borderTopColor: color }}>
     <div className="kpi-value" style={{ color }}>{value}</div>
     <div className="kpi-label">{label}</div>
     {sub && <div className="kpi-sub">{sub}</div>}
+    <ChangeBadge pct={change} />
   </div>
 )
 
@@ -48,18 +62,25 @@ const addDays = (iso, n) => {
   return `${dt.getFullYear()}-${mm}-${dd}`
 }
 
-// Series colors - KPI cards ke saath consistent (Old=green, New=blue, Test=orange)
-const LINE_COLORS = { oldLine: '#4CAF50', newLine: '#2196F3', testCell: '#FF9800' }
-
+// 5 series - colors KPI cards ke saath consistent.
+const LINE_COLORS = {
+  oldLine: '#4CAF50', newLine: '#2196F3', testCell: '#FF9800', paintLine: '#9C27B0', fes: '#F44336',
+}
 const SERIES = [
   { key: 'oldLine', name: 'Old Line', color: LINE_COLORS.oldLine },
   { key: 'newLine', name: 'New Line', color: LINE_COLORS.newLine },
   { key: 'testCell', name: 'Test Cell', color: LINE_COLORS.testCell },
+  { key: 'paintLine', name: 'Paint Line', color: LINE_COLORS.paintLine },
+  { key: 'fes', name: 'FES', color: LINE_COLORS.fes },
 ]
 
-// Reusable chart - 3 series (O/N/T). type='line' ya 'bar' (toggle se).
-const ProdChart = ({ data, xKey, xLabel, type = 'bar', height = 300 }) => {
+const avg = (data, key) =>
+  data.length ? data.reduce((a, r) => a + (r[key] || 0), 0) / data.length : 0
+
+// Reusable chart - sirf 'visible' series dikhata hain, line ya bar.
+const ProdChart = ({ data, xKey, xLabel, type = 'bar', height = 300, visible }) => {
   const Chart = type === 'line' ? LineChart : BarChart
+  const shown = SERIES.filter(s => visible[s.key])
   return (
     <ResponsiveContainer width="100%" height={height}>
       <Chart data={data} margin={{ top: 10, right: 20, left: 0, bottom: xLabel ? 6 : 0 }}>
@@ -72,7 +93,7 @@ const ProdChart = ({ data, xKey, xLabel, type = 'bar', height = 300 }) => {
         <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
         <Tooltip contentStyle={{ background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff' }} />
         <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-        {SERIES.map(s => type === 'line'
+        {shown.map(s => type === 'line'
           ? <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={false} isAnimationActive={false} />
           : <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} isAnimationActive={false} />
         )}
@@ -80,6 +101,25 @@ const ProdChart = ({ data, xKey, xLabel, type = 'bar', height = 300 }) => {
     </ResponsiveContainer>
   )
 }
+
+// Chart + side averages panel (har visible series ka average).
+const ChartWithAvg = ({ data, xKey, xLabel, type, height = 300, visible, avgUnit }) => (
+  <div className="chart-with-avg">
+    <div className="chart-area">
+      <ProdChart data={data} xKey={xKey} xLabel={xLabel} type={type} height={height} visible={visible} />
+    </div>
+    <div className="avg-panel">
+      <div className="avg-title">Average{avgUnit ? ` / ${avgUnit}` : ''}</div>
+      {SERIES.filter(s => visible[s.key]).map(s => (
+        <div key={s.key} className="avg-row">
+          <span className="avg-dot" style={{ background: s.color }} />
+          <span className="avg-name">{s.name}</span>
+          <span className="avg-val">{avg(data, s.key).toFixed(1)}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+)
 
 // Kaunse hours kis shift mein (IST). Per-shift hourly graph ke liye.
 const SHIFT_HOURS = {
@@ -91,17 +131,24 @@ const SHIFT_HOURS = {
 export default function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('hourly')
   const [chartType, setChartType] = useState('line') // 'line' | 'bar' - sab graphs pe
+  // Kaunse series dikhane hain (checkbox se toggle). Default sab.
+  const [visible, setVisible] = useState({
+    oldLine: true, newLine: true, testCell: true, paintLine: true, fes: true,
+  })
+  const toggleSeries = (k) => setVisible(v => ({ ...v, [k]: !v[k] }))
   const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)   // initial load
+  const [busy, setBusy] = useState(false)         // date change in-flight
   const [error, setError] = useState('')
   const [selectedDate, setSelectedDate] = useState(null) // null = latest day (server decides)
   const [trends, setTrends] = useState({ daily: [], monthly: [] })
+  const [trendsLoading, setTrendsLoading] = useState(true)
 
   const load = useCallback((date) => {
     return api.get('/Dashboard/overview', { params: date ? { date } : {} })
       .then(res => { setData(res.data); setError('') })
       .catch(() => setError('Unable to load data. Please ensure the backend server is running on localhost:5000.'))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); setBusy(false) })
   }, [])
 
   // Initial load + jab date change ho.
@@ -113,11 +160,16 @@ export default function Dashboard({ user, onLogout }) {
     return () => clearInterval(id)
   }, [selectedDate, load])
 
-  // Trends (daily + monthly) heavy hain (poori history) - sirf ek baar page load pe,
-  // live 30s refresh pe nahi. Isse 5-crore data pe bhi dashboard fast rehta hain.
+  // Daily chart = selected day ke MONTH ke din. Jab month badle to trends refetch.
+  const trendMonth = (selectedDate || data?.productionDay)?.slice(0, 7) // YYYY-MM
   useEffect(() => {
-    api.get('/Dashboard/trends').then(res => setTrends(res.data)).catch(() => {})
-  }, [])
+    if (!trendMonth) return
+    setTrendsLoading(true)
+    api.get('/Dashboard/trends', { params: { month: trendMonth } })
+      .then(res => setTrends(res.data))
+      .catch(() => {})
+      .finally(() => setTrendsLoading(false))
+  }, [trendMonth])
 
   const currentDay = data?.productionDay
   const minDate = data?.minDate
@@ -126,7 +178,7 @@ export default function Dashboard({ user, onLogout }) {
   // async aata hain to uspe depend karne se rapid clicks race kar jaate the (+2/stuck bug).
   // Pehli load pe selectedDate null -> currentDay (latest) se chalu.
   const effDate = selectedDate || currentDay
-  const goTo = (d) => { if (d) setSelectedDate(d) }
+  const goTo = (d) => { if (d) { setBusy(true); setSelectedDate(d) } }
   const prevDisabled = !effDate || !minDate || effDate <= minDate
   const nextDisabled = !effDate || !maxDate || effDate >= maxDate
   const prev = () => !prevDisabled && goTo(addDays(effDate, -1))
@@ -134,6 +186,7 @@ export default function Dashboard({ user, onLogout }) {
 
   const dateLabel = fmtDate(effDate)
   const kpis = data?.kpis
+  const cmp = data?.compare || {}   // kal se % change (stocks badge)
   const shifts = data?.shifts || { a: EMPTY_SHIFT, b: EMPTY_SHIFT, c: EMPTY_SHIFT }
   const hourly = data?.hourly || []
   const daily = trends?.daily || []
@@ -168,6 +221,7 @@ export default function Dashboard({ user, onLogout }) {
                 <button className="date-arrow" onClick={next} disabled={nextDisabled} title="Next day">›</button>
               </div>
             )}
+            {busy && <Spinner small />}
             <span className="dash-live-dot" />
             <span className="dash-live-text">Live</span>
           </div>
@@ -175,7 +229,7 @@ export default function Dashboard({ user, onLogout }) {
 
         <div className="dash-content">
 
-          {loading && <div className="section-title">Loading…</div>}
+          {loading && <Spinner label="Loading dashboard…" />}
           {error && <div className="section-title" style={{ color: '#EF7A70' }}>{error}</div>}
 
           {/* Selected date pe DB mein koi record nahi */}
@@ -191,11 +245,11 @@ export default function Dashboard({ user, onLogout }) {
             <>
               {/* KPI Cards */}
               <div className="kpi-row">
-                <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" />
-                <KPICard label="New Line QTY"  value={kpis.newLine}   sub="assembly"   color="#2196F3" />
-                <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" />
-                <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" />
-                <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" />
+                <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" change={cmp.oldLine} />
+                <KPICard label="New Line QTY"  value={kpis.newLine}   sub="assembly"   color="#2196F3" change={cmp.newLine} />
+                <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" change={cmp.testCell} />
+                <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" change={cmp.paintLine} />
+                <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" change={cmp.fes} />
               </div>
 
               {/* Shift Summary */}
@@ -221,13 +275,24 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
+              {/* Series select/unselect - jo select karoge wahi sab graphs mein dikhega */}
+              <div className="series-toggle">
+                {SERIES.map(s => (
+                  <label key={s.key} className={`series-chk ${visible[s.key] ? 'on' : ''}`}>
+                    <input type="checkbox" checked={visible[s.key]} onChange={() => toggleSeries(s.key)} />
+                    <span className="series-dot" style={{ background: s.color }} />
+                    {s.name}
+                  </label>
+                ))}
+              </div>
+
               <div className="chart-box">
                 {activeTab === 'hourly' && (
                   <>
                     <div className="chart-heading">Hourly Engines — {dateLabel} (06:00 to 06:00 IST)</div>
                     {hourly.length === 0
                       ? <div className="chart-empty">No hourly data available for this date.</div>
-                      : <ProdChart data={hourly} xKey="hour" xLabel="Hour (IST)" type={chartType} />}
+                      : <ChartWithAvg data={hourly} xKey="hour" xLabel="Hour (IST)" type={chartType} visible={visible} avgUnit="hour" />}
                   </>
                 )}
 
@@ -240,7 +305,7 @@ export default function Dashboard({ user, onLogout }) {
                         <div className="shift-graph-title">Shift {sh} <span>{SHIFT_TIME[sh]}</span></div>
                         {hourlyFor(sh).length === 0
                           ? <div className="chart-empty">No engines in Shift {sh}.</div>
-                          : <ProdChart data={hourlyFor(sh)} xKey="hour" type={chartType} height={210} />}
+                          : <ChartWithAvg data={hourlyFor(sh)} xKey="hour" type={chartType} height={210} visible={visible} avgUnit="hour" />}
                       </div>
                     ))}
                   </>
@@ -248,19 +313,23 @@ export default function Dashboard({ user, onLogout }) {
 
                 {activeTab === 'daily' && (
                   <>
-                    <div className="chart-heading">Daily Engines (per production day)</div>
-                    {daily.length === 0
-                      ? <div className="chart-empty">No daily data available.</div>
-                      : <ProdChart data={daily} xKey="date" type={chartType} />}
+                    <div className="chart-heading">Daily Engines — {effDate ? new Date(effDate + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : ''}</div>
+                    {trendsLoading
+                      ? <Spinner label="Loading daily trend…" />
+                      : daily.length === 0
+                        ? <div className="chart-empty">No daily data available.</div>
+                        : <ChartWithAvg data={daily} xKey="date" type={chartType} visible={visible} avgUnit="day" />}
                   </>
                 )}
 
                 {activeTab === 'monthly' && (
                   <>
-                    <div className="chart-heading">Monthly Engines (per month)</div>
-                    {monthly.length === 0
-                      ? <div className="chart-empty">No monthly data available.</div>
-                      : <ProdChart data={monthly} xKey="month" type={chartType} />}
+                    <div className="chart-heading">Monthly Engines (all history)</div>
+                    {trendsLoading
+                      ? <Spinner label="Loading monthly trend…" />
+                      : monthly.length === 0
+                        ? <div className="chart-empty">No monthly data available.</div>
+                        : <ChartWithAvg data={monthly} xKey="month" type={chartType} visible={visible} avgUnit="month" />}
                   </>
                 )}
               </div>
