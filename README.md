@@ -97,7 +97,7 @@ CMES/
 | Table | Used for | Key columns |
 |---|---|---|
 | `MPI_COB_T_SERIAL_NO_HISTORY` | **Old Line (WS 23800)**, **New Line (WS 33200)**, **Paint Line (WS 52000)** | SERIALNO, WORKSTATION, CREATEDON |
-| `COB_T_AMI_CAPTURE_LOG` | **Test Cell (WS 40200)** | WORKSTATION, SERIALNO, CREATEDON |
+| `MPI_COB_T_AMI_CAPTURE_LOG` | **Test Cell (WS 40200)** | WORKSTATION, SERIALNO, CREATEDON |
 | `MPI_COB_T_TRANSACTION_OUTBOUND` | **FES** (S side) | WIPJOBNO, SERIALNO, OVERALLSTATUS, CREATEDON |
 | `MPI_COB_T_SERIAL_NO` | **FES** (C side, join) | SERIALNO, WORKORDERNO, STATUS, CREATEDON |
 | `CMES_USERS` | **Auth** (in AUTH_DB) | UserId, Username (WWID), FullName, Role, IsActive |
@@ -129,8 +129,8 @@ All Dashboard endpoints require an active CMES user (`[Authorize(Policy = "CmesU
 |---|---|---|
 | GET | `/api/auth/whoami` | Detected Windows user (no DB check) — for the login screen |
 | GET | `/api/auth/me` | CMES_USERS check → **200** (authorized + role/name) or **403** (Access Denied) |
-| GET | `/api/Dashboard/overview?date=YYYY-MM-DD` | Selected day: KPIs, shifts (A/B/C), 24-hour breakdown (IST 06→05), and `compare` (vs-yesterday % per metric, same-time cutoff). 5 metrics run **in parallel**. Hit by the 30s live refresh. |
-| GET | `/api/Dashboard/trends?month=YYYY-MM` | `daily` = that month's days; `monthly` = all history. Single-pass GROUP BY; cached (daily per-month 5 min, monthly once). |
+| GET | `/api/Dashboard/overview?date=YYYY-MM-DD` | Selected day: KPIs, shifts (A/B/C), 24-hour breakdown (IST 06→05) — all 5 metrics — and `compare` (vs-yesterday % per metric, same-elapsed-time cutoff). The 5 metric queries run **in parallel** (each its own DbContext); shift/hour counting is done in C# on the returned timestamps. Hit by the 30s live refresh. |
+| GET | `/api/Dashboard/trends` | `daily` = last 30 days; `monthly` = all history. Per-day SQL `GROUP BY`, cached 5 min. |
 
 ---
 

@@ -160,16 +160,14 @@ export default function Dashboard({ user, onLogout }) {
     return () => clearInterval(id)
   }, [selectedDate, load])
 
-  // Daily chart = selected day ke MONTH ke din. Jab month badle to trends refetch.
-  const trendMonth = (selectedDate || data?.productionDay)?.slice(0, 7) // YYYY-MM
+  // Daily = last 30 din (saari history), Monthly = saara history. Ek baar fetch (cache 5 min backend pe).
+  // trendsLoading already true se start hoti hain - effect me dobara set karne ki zaroorat nahi.
   useEffect(() => {
-    if (!trendMonth) return
-    setTrendsLoading(true)
-    api.get('/Dashboard/trends', { params: { month: trendMonth } })
+    api.get('/Dashboard/trends')
       .then(res => setTrends(res.data))
       .catch(() => {})
       .finally(() => setTrendsLoading(false))
-  }, [trendMonth])
+  }, [])
 
   const currentDay = data?.productionDay
   const minDate = data?.minDate
@@ -313,7 +311,7 @@ export default function Dashboard({ user, onLogout }) {
 
                 {activeTab === 'daily' && (
                   <>
-                    <div className="chart-heading">Daily Engines — {effDate ? new Date(effDate + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : ''}</div>
+                    <div className="chart-heading">Daily Engines — last 30 days</div>
                     {trendsLoading
                       ? <Spinner label="Loading daily trend…" />
                       : daily.length === 0

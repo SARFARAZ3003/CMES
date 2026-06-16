@@ -2,7 +2,7 @@
 #############################################################################
 # ⚠️  LOCAL TEST DB ONLY — PRODUCTION / REAL COMPANY DB PE KABHI MAT CHALAO! #
 # Ye script in tables ko pehle DROP karta hain phir slim sample bana deta:   #
-#   COB_T_AMI_CAPTURE_LOG, MPI_COB_T_SERIAL_NO, MPI_COB_T_TRANSACTION_OUTBOUND#
+#   MPI_COB_T_AMI_CAPTURE_LOG, MPI_COB_T_SERIAL_NO, MPI_COB_T_TRANSACTION_OUTBOUND#
 # Real DB pe in tables mein CRORES rows hain - chalaya to wo UD jaayega.     #
 # Real DB pe ye tables already maujood hain; sirf connection string point    #
 # karna hain, kuch load NAHI karna. Ye sirf hamare local FlexNet DB ke liye. #
@@ -18,7 +18,7 @@ OUT = os.path.join(os.path.dirname(__file__), "_extra_tables.sql")
 
 # (table, source_xlsx, sheet, [(col, sqltype, kind)])  kind: s=string, n=number, d=datetime
 TABLES = [
-    ("COB_T_AMI_CAPTURE_LOG", "AMIUPLOAD.xlsx", "AMIUPLOAD", [
+    ("MPI_COB_T_AMI_CAPTURE_LOG", "AMIUPLOAD.xlsx", "AMIUPLOAD", [
         ("WORKSTATION", "NVARCHAR(40)", "s"),
         ("SERIALNO", "NVARCHAR(40)", "s"),
         ("CREATEDON", "DATETIME2", "d"),

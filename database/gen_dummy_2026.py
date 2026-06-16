@@ -5,7 +5,7 @@ weekend kam, shift-weighted times, FES join chalta hain.
 Existing Jun 3-10 (real) data SKIP. Re-run pe purana dummy (serial>=70000000) delete karke fresh.
 
   History (MPI_COB_T_SERIAL_NO_HISTORY) : Old=23800, New=33200, Paint=52000
-  AMI     (COB_T_AMI_CAPTURE_LOG)       : Test Cell = 40200
+  AMI     (MPI_COB_T_AMI_CAPTURE_LOG)       : Test Cell = 40200
   SerialNo(MPI_COB_T_SERIAL_NO) + Outbound(MPI_COB_T_TRANSACTION_OUTBOUND) : FES
 
 Run:  python gen_dummy_2026.py
@@ -90,7 +90,7 @@ def main():
 
     # Purana dummy (serial>=70000000) hata do - real Jun 3-10 (64-65M) untouched.
     print("Cleaning previous dummy ...")
-    for tbl in ("dbo.MPI_COB_T_SERIAL_NO_HISTORY", "dbo.COB_T_AMI_CAPTURE_LOG",
+    for tbl in ("dbo.MPI_COB_T_SERIAL_NO_HISTORY", "dbo.MPI_COB_T_AMI_CAPTURE_LOG",
                 "dbo.MPI_COB_T_SERIAL_NO", "dbo.MPI_COB_T_TRANSACTION_OUTBOUND"):
         cur.execute(f"DELETE FROM {tbl} WHERE TRY_CAST(SERIALNO AS BIGINT) >= 70000000")
     conn.commit()
@@ -102,7 +102,7 @@ def main():
 
     print("Inserting ...")
     bulk("INSERT INTO dbo.MPI_COB_T_SERIAL_NO_HISTORY (SERIALNO, WORKSTATION, CREATEDON) VALUES (?,?,?)", hist)
-    bulk("INSERT INTO dbo.COB_T_AMI_CAPTURE_LOG (WORKSTATION, SERIALNO, CREATEDON) VALUES (?,?,?)", ami)
+    bulk("INSERT INTO dbo.MPI_COB_T_AMI_CAPTURE_LOG (WORKSTATION, SERIALNO, CREATEDON) VALUES (?,?,?)", ami)
     bulk("INSERT INTO dbo.MPI_COB_T_SERIAL_NO (SERIALNO, WORKORDERNO, STATUS, CREATEDON) VALUES (?,?,?,?)", sn)
     bulk("INSERT INTO dbo.MPI_COB_T_TRANSACTION_OUTBOUND (WIPJOBNO, SERIALNO, OVERALLSTATUS, CREATEDON) VALUES (?,?,?,?)", ob)
 

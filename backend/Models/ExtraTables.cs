@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CMES.Models
 {
-    // Test Cell scans: dbo.COB_T_AMI_CAPTURE_LOG (workstation 40200). Read-only subset.
+    // Test Cell scans: dbo.MPI_COB_T_AMI_CAPTURE_LOG (workstation 40200). Read-only subset.
     [Keyless]
-    [Table("COB_T_AMI_CAPTURE_LOG")]
+    [Table("MPI_COB_T_AMI_CAPTURE_LOG")]
     public class AmiCaptureLog
     {
         [Column("WORKSTATION")] public string? Workstation { get; set; }

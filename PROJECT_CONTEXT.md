@@ -35,7 +35,7 @@ Flow: /auth/whoami (detect user) → Login screen → /auth/me (DB check) → Da
 | Table | Used for | Key columns we read |
 |---|---|---|
 | `MPI_COB_T_SERIAL_NO_HISTORY` | **Old Line (WS 23800)**, **New Line (WS 33200)**, **Paint Line (WS 52000)** | SERIALNO, WORKSTATION, CREATEDON |
-| `COB_T_AMI_CAPTURE_LOG` | **Test Cell (WS 40200)** | WORKSTATION, SERIALNO, CREATEDON |
+| `MPI_COB_T_AMI_CAPTURE_LOG` | **Test Cell (WS 40200)** | WORKSTATION, SERIALNO, CREATEDON |
 | `MPI_COB_T_TRANSACTION_OUTBOUND` | **FES** (S side) | WIPJOBNO, SERIALNO, OVERALLSTATUS, CREATEDON |
 | `MPI_COB_T_SERIAL_NO` | **FES** (C side, join) | SERIALNO, WORKORDERNO, STATUS, CREATEDON |
 | `CMES_USERS` | **Auth** (authorization) — lives in **AUTH_DB** (separate) | UserId, Username(WWID), FullName, Role, IsActive |
@@ -57,8 +57,8 @@ All production tables are **READ-ONLY** from the app (no INSERT/UPDATE/DELETE an
 ## 7. Backend (key files in `backend/`)
 - `Program.cs` — DI, **Negotiate auth**, authorization policy `"CmesUser"`, CORS (`AllowCredentials`, any localhost), MemoryCache, **pooled** DbContext factories, `CommandTimeout(180)`.
 - `Controllers/DashboardController.cs` — `[Authorize(Policy="CmesUser")]`. Endpoints:
-  - `GET /api/Dashboard/overview?date=YYYY-MM-DD` — selected day: KPIs, shifts(A/B/C), hourly(24, IST 06→05), and **`compare`** (vs-yesterday % per metric). **All counting done IN SQL** via `GROUP BY shiftCASE,hour` (helpers `NewEngineAgg`/`PaintAgg`/`TestCellAgg`/`FesAgg`, returning small `ShiftHourCount` rows). 5 metrics run in PARALLEL (own contexts). Live 30s refresh hits only this.
-  - `GET /api/Dashboard/trends?month=YYYY-MM` — **daily = that month's days**, **monthly = ALL history** (every year/month). Single-pass GROUP BY; daily cached per-month (`daily_yyyyMM`), monthly cached once (`monthly`).
+  - `GET /api/Dashboard/overview?date=YYYY-MM-DD` — selected day: KPIs, shifts(A/B/C), hourly(24, IST 06→05) — all 5 metrics. Each metric fetches that day's **scan timestamps** (helpers `NewEngineScans`/`PaintScans`/`TestCellScans`/`FesScans`, returning `List<DateTime>` — small, one row per engine), 5 run in PARALLEL (own contexts via factory); shift/hour/KPI counting done in C# (`ShiftOf`, `.Hour`). Live 30s refresh hits only this. (No vs-yesterday `compare` anymore.)
+  - `GET /api/Dashboard/trends` — **daily = last 30 days**, **monthly = ALL history**. Per-day SQL `GROUP BY` (`PerDayNewEngines`/`PerDayPaint`/`PerDayTestCell`/`PerDayFes` → `DayCount` rows), merged in C#. Cached 5 min under one `trends` key. (No `month` param.)
 - `Controllers/AuthController.cs` — `GET /api/auth/whoami` (detected Windows user, no DB check) + `GET /api/auth/me` (CMES_USERS check → 200 or 403).
 - `Services/CurrentUserService.cs` — WWID extract + CMES_USERS lookup (uses **AuthDbContext / AUTH_DB**); dev fallback to `Environment.UserName` ONLY in Development.
 - `Authorization/CmesUserAuthorization.cs` — policy handler.
@@ -74,12 +74,12 @@ Browser sends Windows identity → API extracts WWID → looks up `CMES_USERS` (
 - `App.jsx` — phase machine: `detecting → landing → authorized | denied`. Calls `/auth/whoami` then shows `Login`; on Log In → `/auth/me` → `Dashboard` or `AccessDenied`. `onLogout` resets to landing.
 - `pages/Login.jsx` — legacy-style landing ("TCL MANUFACTURING EXECUTION SYSTEM", detected username, Log In).
 - `pages/Dashboard.jsx` — the whole dashboard:
-  - **5 KPI cards** (Old/New/Test/Paint/FES) with **vs-yesterday badge** (▲ green / ▼ red / — ).
+  - **5 KPI cards** (Old/New/Test/Paint/FES) — plain value cards (no vs-yesterday badge).
   - **Calendar date picker** (`<input type=date>`, min/max = DB range) + `‹ ›` arrows (±1 day, timezone-safe `addDays`). Nav uses `effDate = selectedDate || currentDay`.
   - Shift A/B/C summary cards.
-  - **4 chart tabs:** Hourly / Shift / Daily / Monthly. Reusable `ProdChart` (**line or bar** toggle). **Daily = selected month's days; Monthly = all history.** Shift tab = 3 separate graphs (A/B/C).
+  - **4 chart tabs:** Hourly / Shift / Daily / Monthly. Reusable `ProdChart` (**line or bar** toggle). **Daily = last 30 days; Monthly = all history.** Shift tab = 3 separate graphs (A/B/C).
   - **5 series with select/unselect checkboxes** (`visible` state). **Averages side panel** per visible series (`ChartWithAvg`).
-  - 30s live refresh (overview only); trends refetch when month changes.
+  - 30s live refresh (overview only); trends fetched once on mount (backend-cached 5 min).
 - `pages/AccessDenied.jsx`, `components/Spinner.jsx` (loading everywhere), `components/Sidebar.jsx` (real user + logout).
 - `api/client.js` — axios baseURL `http://localhost:5000/api`, `withCredentials:true`.
 - Colors: Old=green #4CAF50, New=blue #2196F3, Test=orange #FF9800, Paint=purple #9C27B0, FES=red #F44336. Accent dark-red #8B0000, bg #111/#1a1a1a. Tab title + favicon = CMES.
@@ -93,8 +93,8 @@ Browser sends Windows identity → API extracts WWID → looks up `CMES_USERS` (
 - **To point at sir's real DB: only change these two strings. No code change** (unless CMES_USERS has different table/column names → edit `Models/CmesUser.cs`).
 
 ## 11. Performance (for the real ~5-crore-row DB)
-- **Never fetch whole table** — all counting is SQL `GROUP BY`/`COUNT`, returns tiny results.
-- Overview: 5 targeted queries **parallel** (per-day, indexed). Trends: single-pass aggregates, **cached** (monthly once, daily per-month).
+- **Never fetch whole table** — every query is filtered to one day (overview) or aggregated per-day (trends); results stay tiny (≈ one row per engine, or one row per day).
+- Overview: 5 targeted per-day queries **parallel** (indexed); shift/hour/KPI counts computed in C# on the small timestamp lists. Trends: per-day SQL `GROUP BY`, merged in C#, **cached 5 min** (single `trends` key).
 - **Indexes are essential** — `database/indexes.sql` (HIST(WS,SER,CON), AMI(WS,CON), OUTBOUND(OVERALLSTATUS,CON) incl WIPJOBNO, SERIAL_NO(WORKORDERNO) incl SERIALNO,STATUS). Sir says real DB already has indexes → don't recreate on prod.
 - `CommandTimeout=180s`. Local warm timings: overview ~30ms, trends cold ~0.6s then cached.
 
