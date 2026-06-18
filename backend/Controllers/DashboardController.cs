@@ -33,7 +33,7 @@ namespace CMES.Controllers
         // ---- Line mapping (sir ke hisaab se) ----
         private const string OLD_LINE = "23800";     // MPI_COB_T_SERIAL_NO_HISTORY, NOT EXISTS (naya engine)
         private const string NEW_LINE = "33200";     // ditto
-        private const string PAINT_LINE = "52000";   // ditto par COUNT(*) (duplicates)
+        private const string PAINT_LINE = "52000";   // ditto par DISTINCT serials per day (dedup)
         private const string TEST_CELL_WS = "40200"; // MPI_COB_T_AMI_CAPTURE_LOG, COUNT(*) (duplicates)
         // FES = MPI_COB_T_TRANSACTION_OUTBOUND ⨝ MPI_COB_T_SERIAL_NO. Shipped: source nahi - 0.
 
@@ -108,12 +108,16 @@ namespace CMES.Controllers
             return rows.GroupBy(r => r.SerialNo).Select(g => g.Min(x => x.On)).ToList();
         }
 
+        // Paint = WS 52000, us din ke DISTINCT engines (serial dedup - duplicate scan ek hi baar).
+        // Har serial ka 1 timestamp (min) rakha taaki shift/hour bucketing kaam kare.
         private async Task<List<DateTime>> PaintScans(DateTime startUtc, DateTime endUtc)
         {
             await using var db = await _factory.CreateDbContextAsync();
-            return await db.SerialNoHistory.AsNoTracking()
-                .Where(h => h.Workstation == PAINT_LINE && h.CreatedOn >= startUtc && h.CreatedOn < endUtc)
-                .Select(h => h.CreatedOn!.Value).ToListAsync();
+            var rows = await db.SerialNoHistory.AsNoTracking()
+                .Where(h => h.Workstation == PAINT_LINE && h.CreatedOn >= startUtc && h.CreatedOn < endUtc && h.SerialNo != null)
+                .Select(h => new { h.SerialNo, On = h.CreatedOn!.Value })
+                .ToListAsync();
+            return rows.GroupBy(r => r.SerialNo).Select(g => g.Min(x => x.On)).ToList();
         }
 
         private async Task<List<DateTime>> TestCellScans(DateTime startUtc, DateTime endUtc)
@@ -170,9 +174,12 @@ namespace CMES.Controllers
             }
         }
 
-        // GET /api/Dashboard/overview?date=2026-06-10  (live refresh isi ko hit karta hain)
+        // GET /api/Dashboard/overview?date=2026-06-10&cycOld=150&cycNew=140&cycTest=180&cycPaint=180
+        // cyc* optional: UI se cycle-time bheja to plan usse, warna appsettings/default se. (live refresh isi ko hit karta hain)
         [HttpGet("overview")]
-        public async Task<IActionResult> Overview([FromQuery] string? date = null)
+        public async Task<IActionResult> Overview([FromQuery] string? date = null,
+            [FromQuery] int? cycOld = null, [FromQuery] int? cycNew = null,
+            [FromQuery] int? cycTest = null, [FromQuery] int? cycPaint = null)
         {
             (DateTime min, DateTime max)? range;
             try { range = await GetRangeAsync(); }
@@ -252,10 +259,15 @@ namespace CMES.Controllers
             var effNow = nowIst < dayStartIst ? dayStartIst : (nowIst > dayEndIst ? dayEndIst : nowIst);
             var workSec = (effNow - dayStartIst).TotalSeconds - BreakSeconds(dayStartIst, effNow);
 
-            int oPlan = PlanCount(workSec, Cyc("OldLine", 150));
-            int nPlan = PlanCount(workSec, Cyc("NewLine", 140));
-            int tPlan = PlanCount(workSec, Cyc("TestCell", 180));
-            int pPlan = PlanCount(workSec, Cyc("PaintLine", 180));
+            // Cycle = UI se aaya (>0) to wahi, warna appsettings/default. Plan inhi se banta.
+            int cOld = (cycOld > 0 ? cycOld.Value : Cyc("OldLine", 150));
+            int cNew = (cycNew > 0 ? cycNew.Value : Cyc("NewLine", 140));
+            int cTest = (cycTest > 0 ? cycTest.Value : Cyc("TestCell", 180));
+            int cPaint = (cycPaint > 0 ? cycPaint.Value : Cyc("PaintLine", 180));
+            int oPlan = PlanCount(workSec, cOld);
+            int nPlan = PlanCount(workSec, cNew);
+            int tPlan = PlanCount(workSec, cTest);
+            int pPlan = PlanCount(workSec, cPaint);
             object? plan = hasData ? new
             {
                 oldLine = new { target = oPlan, pct = PlanPct(oldIst.Count, oPlan) },
@@ -280,6 +292,7 @@ namespace CMES.Controllers
                     shipped = 0
                 },
                 plan,
+                cycle = new { oldLine = cOld, newLine = cNew, testCell = cTest, paintLine = cPaint },
                 shifts,
                 hourly
             });
@@ -315,7 +328,7 @@ namespace CMES.Controllers
         {
             await using var db = await _factory.CreateDbContextAsync();
             var sql = @"
-            SELECT CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE) AS BizDay, COUNT(*) AS Cnt
+            SELECT CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE) AS BizDay, COUNT(DISTINCT SERIALNO) AS Cnt
             FROM MPI_COB_T_SERIAL_NO_HISTORY
             WHERE WORKSTATION = {0} AND CREATEDON >= {1} AND CREATEDON < {2}
             GROUP BY CAST(DATEADD(MINUTE,-30, CREATEDON) AS DATE)

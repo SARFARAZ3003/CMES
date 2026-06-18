@@ -198,6 +198,43 @@
 .kpi-change.up { color: #4CAF50; }
 .kpi-change.down { color: #F44336; }
 .kpi-change.flat { color: rgba(255,255,255,0.25); }
+/* Cycle-time input bar (sec/engine) - plan inhi se banta */
+.cycle-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+}
+.cycle-bar-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+}
+.cycle-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+.cycle-input input {
+  width: 64px;
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.cycle-input input:focus { outline: none; border-color: #8B0000; }
+
 /* Plan badge (% + target) - cycle-time se */
 .kpi-plan {
   margin-top: 10px;

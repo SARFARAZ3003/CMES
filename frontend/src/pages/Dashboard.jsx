@@ -139,22 +139,26 @@ export default function Dashboard({ user, onLogout }) {
   const [selectedDate, setSelectedDate] = useState(null) // null = latest day (server decides)
   const [trends, setTrends] = useState({ daily: [], monthly: [] })
   const [trendsLoading, setTrendsLoading] = useState(true)
+  const [cycle, setCycle] = useState(null)  // cycle-time (sec/engine) per line; pehli load pe backend se init
 
-  const load = useCallback((date) => {
-    return api.get('/Dashboard/overview', { params: date ? { date } : {} })
-      .then(res => { setData(res.data); setError('') })
+  const load = useCallback((date, cyc) => {
+    const params = {}
+    if (date) params.date = date
+    if (cyc) { params.cycOld = cyc.oldLine; params.cycNew = cyc.newLine; params.cycTest = cyc.testCell; params.cycPaint = cyc.paintLine }
+    return api.get('/Dashboard/overview', { params })
+      .then(res => { setData(res.data); setCycle(prev => prev ?? res.data.cycle); setError('') })
       .catch(() => setError('Unable to load data. Please ensure the backend server is running on localhost:5000.'))
       .finally(() => { setLoading(false); setBusy(false) })
   }, [])
 
-  // Initial load + jab date change ho.
-  useEffect(() => { load(selectedDate) }, [selectedDate, load])
+  // Initial load + jab date YA cycle-time change ho (plan recompute).
+  useEffect(() => { load(selectedDate, cycle) }, [selectedDate, cycle, load])
 
-  // Live: har 30s pe refresh (sirf selected-din ka overview - fast).
+  // Live: har 30s pe refresh (selected-din + current cycle-time).
   useEffect(() => {
-    const id = setInterval(() => load(selectedDate), 30000)
+    const id = setInterval(() => load(selectedDate, cycle), 30000)
     return () => clearInterval(id)
-  }, [selectedDate, load])
+  }, [selectedDate, cycle, load])
 
   const currentDay = data?.productionDay
   const minDate = data?.minDate
@@ -253,6 +257,20 @@ export default function Dashboard({ user, onLogout }) {
 
           {!loading && !error && data?.hasData && kpis && (
             <>
+              {/* Cycle-time inputs (sec/engine) - plan inhi se banta hain; badlo to plan turant update */}
+              {cycle && (
+                <div className="cycle-bar">
+                  <span className="cycle-bar-label">Cycle Time (sec/engine)</span>
+                  {[['oldLine', 'Old'], ['newLine', 'New'], ['testCell', 'Test'], ['paintLine', 'Paint']].map(([k, lbl]) => (
+                    <label key={k} className="cycle-input">
+                      <span>{lbl}</span>
+                      <input type="number" min="1" value={cycle[k]}
+                        onChange={e => setCycle(c => ({ ...c, [k]: Number(e.target.value) || 0 }))} />
+                    </label>
+                  ))}
+                </div>
+              )}
+
               {/* KPI Cards */}
               <div className="kpi-row">
                 <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" plan={plan.oldLine} />
