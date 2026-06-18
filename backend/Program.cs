@@ -58,6 +58,30 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// ---- Startup DB connectivity check: real DB se connect karte waqt PEHLA failure point yahin console pe pakdo ----
+{
+    var slog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("CMES.Startup");
+    try
+    {
+        await using var db = await app.Services.GetRequiredService<IDbContextFactory<CmesDbContext>>().CreateDbContextAsync();
+        if (await db.Database.CanConnectAsync())
+            slog.LogInformation("[CMES-DB-OK] CMES_DB connected -> {Db}", db.Database.GetDbConnection().Database);
+        else
+            slog.LogError("[CMES-DB-FAIL] CMES_DB CanConnect=false -> connection string / server / network check karo");
+    }
+    catch (Exception ex) { slog.LogError(ex, "[CMES-DB-FAIL] CMES_DB connect FAILED -> {Msg}", ex.Message); }
+
+    try
+    {
+        await using var adb = await app.Services.GetRequiredService<IDbContextFactory<AuthDbContext>>().CreateDbContextAsync();
+        if (await adb.Database.CanConnectAsync())
+            slog.LogInformation("[CMES-DB-OK] AUTH_DB connected -> {Db}", adb.Database.GetDbConnection().Database);
+        else
+            slog.LogError("[CMES-DB-FAIL] AUTH_DB CanConnect=false -> connection string / server / network check karo");
+    }
+    catch (Exception ex) { slog.LogError(ex, "[CMES-DB-FAIL] AUTH_DB connect FAILED -> {Msg}", ex.Message); }
+}
+
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors("AllowReactApp");

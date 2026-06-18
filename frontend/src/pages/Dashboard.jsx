@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import './Dashboard.css'
 
-// Kal se compare badge (stocks board jaisa). pct: +ve up (green), -ve down (red), null = no data.
+// Plan se % (cycle-time). pct = (actual-plan)/plan: +ve aage (green ▲), -ve peeche (red ▼), null = no plan.
 const ChangeBadge = ({ pct }) => {
   if (pct === null || pct === undefined) return <div className="kpi-change flat">—</div>
   const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
@@ -20,12 +20,14 @@ const ChangeBadge = ({ pct }) => {
   )
 }
 
-const KPICard = ({ label, value, sub, color, change }) => (
+const KPICard = ({ label, value, sub, color, plan }) => (
   <div className="kpi-card" style={{ borderTopColor: color }}>
     <div className="kpi-value" style={{ color }}>{value}</div>
     <div className="kpi-label">{label}</div>
     {sub && <div className="kpi-sub">{sub}</div>}
-    <ChangeBadge pct={change} />
+    {plan
+      ? <div className="kpi-plan"><ChangeBadge pct={plan.pct} /><span className="kpi-target">Plan {plan.target}</span></div>
+      : <ChangeBadge pct={null} />}
   </div>
 )
 
@@ -122,12 +124,6 @@ const ChartWithAvg = ({ data, xKey, xLabel, type, height = 300, visible, avgUnit
 )
 
 // Kaunse hours kis shift mein (IST). Per-shift hourly graph ke liye.
-const SHIFT_HOURS = {
-  A: [6, 7, 8, 9, 10, 11, 12, 13],
-  B: [14, 15, 16, 17, 18, 19, 20, 21],
-  C: [22, 23, 0, 1, 2, 3, 4, 5],
-}
-
 export default function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('hourly')
   const [chartType, setChartType] = useState('line') // 'line' | 'bar' - sab graphs pe
@@ -160,22 +156,23 @@ export default function Dashboard({ user, onLogout }) {
     return () => clearInterval(id)
   }, [selectedDate, load])
 
-  // Daily = last 30 din (saari history), Monthly = saara history. Ek baar fetch (cache 5 min backend pe).
-  // trendsLoading already true se start hoti hain - effect me dobara set karne ki zaroorat nahi.
-  useEffect(() => {
-    api.get('/Dashboard/trends')
-      .then(res => setTrends(res.data))
-      .catch(() => {})
-      .finally(() => setTrendsLoading(false))
-  }, [])
-
   const currentDay = data?.productionDay
   const minDate = data?.minDate
   const maxDate = data?.maxDate
-  // Navigation 'selectedDate' (turant intent) pe based hain - currentDay (server echo)
-  // async aata hain to uspe depend karne se rapid clicks race kar jaate the (+2/stuck bug).
-  // Pehli load pe selectedDate null -> currentDay (latest) se chalu.
+  // effDate = abhi jis din pe ho (selectedDate, warna server ka latest). Nav + trends sab isi se.
+  // currentDay (server echo) pe nahi - rapid clicks race kar jaate the (+2/stuck bug).
   const effDate = selectedDate || currentDay
+  const effYear = effDate ? Number(String(effDate).slice(0, 4)) : null
+
+  // Trends (daily+monthly) = effDate ke YEAR ka. Year badalne pe hi refetch (backend per-year cached).
+  useEffect(() => {
+    if (!effYear) return
+    setTrendsLoading(true)
+    api.get('/Dashboard/trends', { params: { year: effYear } })
+      .then(res => setTrends(res.data))
+      .catch(() => {})
+      .finally(() => setTrendsLoading(false))
+  }, [effYear])
   const goTo = (d) => { if (d) { setBusy(true); setSelectedDate(d) } }
   const prevDisabled = !effDate || !minDate || effDate <= minDate
   const nextDisabled = !effDate || !maxDate || effDate >= maxDate
@@ -184,13 +181,28 @@ export default function Dashboard({ user, onLogout }) {
 
   const dateLabel = fmtDate(effDate)
   const kpis = data?.kpis
-  const cmp = data?.compare || {}   // kal se % change (stocks badge)
+  const plan = data?.plan || {}   // cycle-time plan se % (O/N/T/P only)
   const shifts = data?.shifts || { a: EMPTY_SHIFT, b: EMPTY_SHIFT, c: EMPTY_SHIFT }
   const hourly = data?.hourly || []
   const daily = trends?.daily || []
   const monthly = trends?.monthly || []
-  // Per-shift hourly: hourly array ko us shift ke hours pe filter karo.
-  const hourlyFor = (sh) => hourly.filter(h => SHIFT_HOURS[sh].includes(parseInt(h.hour, 10)))
+  // Daily chart = effDate ke MONTH ke din (jo date pe ho, wahi month dikhe). backend "dd MMM" deta hai.
+  const selMonthAbbr = effDate ? new Date(String(effDate) + 'T00:00:00').toLocaleString('en-US', { month: 'short' }) : ''
+  const dailyMonth = daily.filter(d => d.date.slice(3) === selMonthAbbr)
+  // Per-shift graph: 48 half-hour buckets ko shift se filter (exact :30 boundary).
+  const hourlyFor = (sh) => hourly.filter(h => h.shift === sh)
+  // Hourly TAB: 48 half-hour buckets ko 1-ghante mein jodo (24 points, saaf - clash nahi).
+  const hourlyByHour = (() => {
+    const map = new Map()  // "HH:00" -> summed slot (order preserved, 06->05)
+    for (const s of hourly) {
+      const key = s.time.slice(0, 2) + ':00'
+      const cur = map.get(key) || { time: key, oldLine: 0, newLine: 0, testCell: 0, paintLine: 0, fes: 0 }
+      cur.oldLine += s.oldLine; cur.newLine += s.newLine; cur.testCell += s.testCell
+      cur.paintLine += s.paintLine; cur.fes += s.fes
+      map.set(key, cur)
+    }
+    return Array.from(map.values())
+  })()
 
   return (
     <div className="dash-root">
@@ -243,11 +255,11 @@ export default function Dashboard({ user, onLogout }) {
             <>
               {/* KPI Cards */}
               <div className="kpi-row">
-                <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" change={cmp.oldLine} />
-                <KPICard label="New Line QTY"  value={kpis.newLine}   sub="assembly"   color="#2196F3" change={cmp.newLine} />
-                <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" change={cmp.testCell} />
-                <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" change={cmp.paintLine} />
-                <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" change={cmp.fes} />
+                <KPICard label="Old Line QTY"  value={kpis.oldLine}   sub="assembly"   color="#4CAF50" plan={plan.oldLine} />
+                <KPICard label="New Line QTY"  value={kpis.newLine}   sub="assembly"   color="#2196F3" plan={plan.newLine} />
+                <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" plan={plan.testCell} />
+                <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" plan={plan.paintLine} />
+                <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" />
               </div>
 
               {/* Shift Summary */}
@@ -271,6 +283,7 @@ export default function Dashboard({ user, onLogout }) {
                   <button className={chartType === 'line' ? 'active' : ''} onClick={() => setChartType('line')}>Line</button>
                   <button className={chartType === 'bar' ? 'active' : ''} onClick={() => setChartType('bar')}>Bar</button>
                 </div>
+
               </div>
 
               {/* Series select/unselect - jo select karoge wahi sab graphs mein dikhega */}
@@ -288,9 +301,9 @@ export default function Dashboard({ user, onLogout }) {
                 {activeTab === 'hourly' && (
                   <>
                     <div className="chart-heading">Hourly Engines — {dateLabel} (06:00 to 06:00 IST)</div>
-                    {hourly.length === 0
+                    {hourlyByHour.length === 0
                       ? <div className="chart-empty">No hourly data available for this date.</div>
-                      : <ChartWithAvg data={hourly} xKey="hour" xLabel="Hour (IST)" type={chartType} visible={visible} avgUnit="hour" />}
+                      : <ChartWithAvg data={hourlyByHour} xKey="time" xLabel="Hour (IST)" type={chartType} visible={visible} avgUnit="hour" />}
                   </>
                 )}
 
@@ -303,7 +316,7 @@ export default function Dashboard({ user, onLogout }) {
                         <div className="shift-graph-title">Shift {sh} <span>{SHIFT_TIME[sh]}</span></div>
                         {hourlyFor(sh).length === 0
                           ? <div className="chart-empty">No engines in Shift {sh}.</div>
-                          : <ChartWithAvg data={hourlyFor(sh)} xKey="hour" type={chartType} height={210} visible={visible} avgUnit="hour" />}
+                          : <ChartWithAvg data={hourlyFor(sh)} xKey="time" type={chartType} height={210} visible={visible} avgUnit="slot" />}
                       </div>
                     ))}
                   </>
@@ -311,18 +324,18 @@ export default function Dashboard({ user, onLogout }) {
 
                 {activeTab === 'daily' && (
                   <>
-                    <div className="chart-heading">Daily Engines — last 30 days</div>
+                    <div className="chart-heading">Daily Engines — {selMonthAbbr} {effYear}</div>
                     {trendsLoading
                       ? <Spinner label="Loading daily trend…" />
-                      : daily.length === 0
-                        ? <div className="chart-empty">No daily data available.</div>
-                        : <ChartWithAvg data={daily} xKey="date" type={chartType} visible={visible} avgUnit="day" />}
+                      : dailyMonth.length === 0
+                        ? <div className="chart-empty">No daily data for {selMonthAbbr} {effYear}.</div>
+                        : <ChartWithAvg data={dailyMonth} xKey="date" type={chartType} visible={visible} avgUnit="day" />}
                   </>
                 )}
 
                 {activeTab === 'monthly' && (
                   <>
-                    <div className="chart-heading">Monthly Engines (all history)</div>
+                    <div className="chart-heading">Monthly Engines — {effYear}</div>
                     {trendsLoading
                       ? <Spinner label="Loading monthly trend…" />
                       : monthly.length === 0

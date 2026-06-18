@@ -198,6 +198,19 @@
 .kpi-change.up { color: #4CAF50; }
 .kpi-change.down { color: #F44336; }
 .kpi-change.flat { color: rgba(255,255,255,0.25); }
+/* Plan badge (% + target) - cycle-time se */
+.kpi-plan {
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.kpi-plan .kpi-change { margin-top: 0; }
+.kpi-target {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+}
 .kpi-change-sub {
   color: rgba(255,255,255,0.3);
   font-weight: 400;
@@ -331,6 +344,20 @@
   background: rgba(255,255,255,0.12);
   color: #fff;
 }
+
+/* Trend year dropdown (Daily/Monthly) */
+.year-select {
+  margin-left: 10px;
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.year-select:hover { border-color: rgba(255,255,255,0.35); }
+.year-select:focus { outline: none; border-color: #8B0000; }
 
 /* Series select/unselect checkboxes */
 .series-toggle {
