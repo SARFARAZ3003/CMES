@@ -1,0 +1,315 @@
+/* ─── WipReport.css ──────────────────────────────────────────────────────────
+   Scoped styles for the WIP Report page.
+   All structural chrome (dash-root, dash-main, dash-topbar, dash-content,
+   kpi-card, chart-box, section-title) is inherited from Dashboard.css.
+   Only WIP-specific overrides live here.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Two-panel row ── */
+.wip-panels {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  height: calc(100vh - 220px);
+  min-height: 0;
+}
+
+/* ── Panel widths ── */
+.wip-left  { flex: 0 0 30%; max-width: 30%; display: flex; flex-direction: column; height: 100%; }
+.wip-right { flex: 1 1 70%;               display: flex; flex-direction: column; height: 100%; }
+
+/* Override chart-box padding to let the table flush to edges */
+.wip-left.chart-box,
+.wip-right.chart-box {
+  padding: 0;
+  overflow: hidden;
+  /* Card frame stays dark — only the table interior goes light */
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Panel title bar — dark red, same as shift card headers ── */
+.wip-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fff;
+  background: #8B0000;
+  border-bottom: 2px solid #6b0000;
+  flex-shrink: 0;
+}
+
+.wip-panel-sub {
+  font-weight: 400;
+  color: rgba(255,255,255,0.7);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
+/* Clear-filter button inside the title */
+.wip-clear-btn {
+  margin-left: auto;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 10px;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+.wip-clear-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* ── Scrollable table wrapper ── */
+.wip-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  /* Light background starts here — frames the table body */
+  background: #fff;
+}
+
+.wip-table-wrap::-webkit-scrollbar        { width: 7px; height: 7px; }
+.wip-table-wrap::-webkit-scrollbar-track  { background: #e8e8e8; }
+.wip-table-wrap::-webkit-scrollbar-thumb  { background: #8B0000; border-radius: 4px; }
+.wip-table-wrap::-webkit-scrollbar-thumb:hover { background: #6b0000; }
+
+/* ── Base table — light background, dark readable text ── */
+.wip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+/* Sticky header — dark bg so it visually anchors the table */
+.wip-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.wip-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  background: #2c2c2c;
+  border-bottom: 2px solid #8B0000;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+
+.wip-table th:last-child { border-right: none; }
+
+/* Data cells — white bg, near-black text — maximum contrast */
+.wip-table td {
+  padding: 8px 14px;
+  color: #1a1a1a;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #f0f0f0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.wip-table td:last-child { border-right: none; }
+
+/* Alternating row tint for easier row tracking */
+.wip-table tbody tr:nth-child(even) td {
+  background: #f7f7f7;
+}
+
+/* numeric column – right-align */
+.wip-th-num { text-align: right !important; }
+
+/* ── Summary table rows ── */
+.wip-summary-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.wip-summary-row:hover td {
+  background: #fff3e0 !important;   /* warm amber tint on hover */
+  color: #1a1a1a;
+}
+
+.wip-summary-row td:first-child {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #1a1a1a;
+}
+
+/* Selected row — strong red highlight, white text */
+.wip-row-selected td {
+  background: #8B0000 !important;
+  color: #fff !important;
+  border-bottom-color: #6b0000 !important;
+  border-right-color: rgba(255,255,255,0.15) !important;
+}
+
+.wip-row-selected td:first-child {
+  border-left: 4px solid #ff1a1a;
+}
+
+/* Override alternating tint for selected rows */
+.wip-row-selected:nth-child(even) td {
+  background: #8B0000 !important;
+}
+
+/* Total row — dark bg to visually separate it from data rows */
+.wip-total-row td {
+  font-weight: 700;
+  color: #fff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #2c2c2c !important;
+  border-top: 2px solid #8B0000;
+}
+
+/* Quantity badge */
+.wip-qty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e3f0fc;
+  color: #1565C0;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #90CAF9;
+}
+
+.wip-qty-total {
+  background: #8B0000;
+  color: #fff;
+  border-color: #6b0000;
+}
+
+/* ── Detail table extras ── */
+.wip-detail-table { min-width: 900px; }
+
+.wip-detail-table tbody tr:hover td {
+  background: #fff3e0 !important;
+}
+
+.wip-detail-table tbody tr:nth-child(even):hover td {
+  background: #fff3e0 !important;
+}
+
+/* Monospaced cells — timestamps, serial numbers, workorders */
+.wip-mono {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11.5px;
+  color: #37474F;   /* dark blue-grey — readable but visually distinct from labels */
+}
+
+/* Status badge — coloured pill, works on white bg */
+.wip-status-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.wip-empty {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  background: #fff;
+}
+
+/* ── Responsive: stack panels on narrow viewports ── */
+@media (max-width: 900px) {
+  .wip-panels {
+    flex-direction: column;
+    height: auto;
+  }
+  .wip-left,
+  .wip-right {
+    flex: 1 1 100%;
+    max-width: 100%;
+    height: 400px;
+  }
+}
+
+/* ── Skeleton loader rows (shown while summary is loading) ── */
+.wip-skeleton-row td {
+  pointer-events: none;
+  background: #fff !important;
+}
+.wip-skeleton {
+  display: inline-block;
+  width: 80%;
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: wip-shimmer 1.4s infinite;
+}
+.wip-skeleton-sm { width: 30%; }
+@keyframes wip-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Error state ── */
+.wip-error {
+  color: #c62828 !important;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  margin: 16px;
+  padding: 14px 16px;
+  font-weight: 600;
+}
+
+/* ── Export Excel button ── */
+.wip-export-btn {
+  margin-left: auto;
+  padding: 4px 13px;
+  background: rgba(76,175,80,0.15);
+  border: 1px solid rgba(76,175,80,0.5);
+  color: #a5d6a7;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wip-export-btn:hover:not(:disabled) {
+  background: rgba(76,175,80,0.28);
+  border-color: #66BB6A;
+  color: #c8e6c9;
+}
+
+.wip-export-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

@@ -128,3 +128,36 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Model Tracking view toggle ─────────────────────────────────────────── */
+.mt-view-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;          /* stays visible on narrow screens */
+}
+
+.mt-toggle-btn {
+  padding: 7px 20px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.mt-toggle-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85);
+}
+
+.mt-toggle-active {
+  background: #8B0000 !important;
+  border-color: #8B0000 !important;
+  color: #fff !important;
+}
