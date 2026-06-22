@@ -19,6 +19,7 @@ builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNe
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();             // WWID -> CMES_USERS lookup
 builder.Services.AddScoped<CycleTimeService>();               // cycle-time (sec/engine) Oracle se (ya fallback)
+builder.Services.AddScoped<DispatchService>();                // shipped (dispatch qty) Oracle se (ya 0)
 builder.Services.AddScoped<IAuthorizationHandler, CmesUserHandler>();
 
 //Policy "CmesUser": current Windows user CMES_USERS mein active ho.

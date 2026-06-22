@@ -275,6 +275,7 @@ export default function Dashboard({ user, onLogout }) {
                 <KPICard label="In Test Cell"  value={kpis.testCell}  sub="testing"    color="#FF9800" plan={plan.testCell} />
                 <KPICard label="Paint Line"    value={kpis.paintLine} sub="upfitment"  color="#9C27B0" plan={plan.paintLine} />
                 <KPICard label="FES"           value={kpis.fes}       sub="completion" color="#F44336" />
+                <KPICard label="Shipped"       value={kpis.shipped}   sub="dispatch"   color="#00BCD4" />
               </div>
 
               {/* Shift Summary */}

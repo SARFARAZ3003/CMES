@@ -19,13 +19,15 @@ namespace CMES.Controllers
         private readonly IConfiguration _config;
         private readonly ILogger<DashboardController> _logger;
         private readonly CycleTimeService _cycle;   // cycle-time Oracle se (ya fallback)
-        public DashboardController(IDbContextFactory<CmesDbContext> factory, IMemoryCache cache, IConfiguration config, ILogger<DashboardController> logger, CycleTimeService cycle)
+        private readonly DispatchService _dispatch; // shipped (dispatch) Oracle se (ya 0)
+        public DashboardController(IDbContextFactory<CmesDbContext> factory, IMemoryCache cache, IConfiguration config, ILogger<DashboardController> logger, CycleTimeService cycle, DispatchService dispatch)
         {
             _factory = factory;
             _cache = cache;
             _config = config;
             _logger = logger;
             _cycle = cycle;
+            _dispatch = dispatch;
         }
 
         // Parallel tasks me se kaun-kaun FAIL hui - naam + ASLI SQL error (console pe exact pinpoint).
@@ -198,6 +200,9 @@ namespace CMES.Controllers
             var startUtc = DayStartUtc(selected);
             var endUtc = startUtc.AddDays(1);
 
+            // Shipped (Oracle TCL_T_DISPATCHSHIFT) ko metrics ke saath PARALLEL chalu kar do (alag Oracle conn).
+            var shippedT = _dispatch.GetShippedAsync(selected);
+
             // 5 metric queries SINGLE-PHASE parallel (har ek apna context). Plan% cycle-time se hota hai (DB query nahi),
             // isliye ab koi prev-day compare query nahi - sirf 5.
             var oldT = NewEngineScans(OLD_LINE, startUtc, endUtc);
@@ -221,6 +226,10 @@ namespace CMES.Controllers
 
             bool hasData = oldIst.Count + newIst.Count + tcIst.Count + paintIst.Count + fesIst.Count > 0;
 
+            // Shipped per shift (Oracle se; local pe sab 0). Total = teeno ka jod.
+            var shipped = await shippedT;
+            int shippedTotal = shipped.Values.Sum();
+
             object ShiftBlock(string s) => new
             {
                 oldLine = oldIst.Count(x => ShiftOf(x) == s),
@@ -228,7 +237,7 @@ namespace CMES.Controllers
                 testCell = tcIst.Count(x => ShiftOf(x) == s),
                 paintLine = paintIst.Count(x => ShiftOf(x) == s),
                 fes = fesIst.Count(x => ShiftOf(x) == s),
-                shipped = 0
+                shipped = shipped.GetValueOrDefault(s)
             };
             var shifts = new { A = ShiftBlock("A"), B = ShiftBlock("B"), C = ShiftBlock("C") };
 
@@ -290,7 +299,7 @@ namespace CMES.Controllers
                     testCell = tcIst.Count,
                     paintLine = paintIst.Count,
                     fes = fesIst.Count,
-                    shipped = 0
+                    shipped = shippedTotal
                 },
                 plan,
                 cycle = new { oldLine = cOld, newLine = cNew, testCell = cTest, paintLine = cPaint },
