@@ -217,23 +217,32 @@
   color: rgba(255,255,255,0.55);
   text-transform: uppercase;
 }
-.cycle-input {
+/* Read-only cycle-time chip (Oracle se, admin-managed - edit nahi hota) */
+.cycle-readonly {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 13px;
   color: rgba(255,255,255,0.7);
 }
-.cycle-input input {
-  width: 64px;
+.cycle-readonly-label { color: rgba(255,255,255,0.5); }
+.cycle-readonly-val {
+  min-width: 44px;
+  text-align: center;
   background: #1a1a1a;
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 13px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.cycle-input input:focus { outline: none; border-color: #8B0000; }
+.cycle-source {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.3px;
+}
 
 /* Plan badge (% + target) - cycle-time se */
 .kpi-plan {

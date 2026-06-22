@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using CMES.Data;
+using CMES.Services;
 
 namespace CMES.Controllers
 {
@@ -17,12 +18,14 @@ namespace CMES.Controllers
         private readonly IMemoryCache _cache;
         private readonly IConfiguration _config;
         private readonly ILogger<DashboardController> _logger;
-        public DashboardController(IDbContextFactory<CmesDbContext> factory, IMemoryCache cache, IConfiguration config, ILogger<DashboardController> logger)
+        private readonly CycleTimeService _cycle;   // cycle-time Oracle se (ya fallback)
+        public DashboardController(IDbContextFactory<CmesDbContext> factory, IMemoryCache cache, IConfiguration config, ILogger<DashboardController> logger, CycleTimeService cycle)
         {
             _factory = factory;
             _cache = cache;
             _config = config;
             _logger = logger;
+            _cycle = cycle;
         }
 
         // Parallel tasks me se kaun-kaun FAIL hui - naam + ASLI SQL error (console pe exact pinpoint).
@@ -58,8 +61,7 @@ namespace CMES.Controllers
         private static DateTime DayStartUtc(DateTime bizDay) => bizDay.AddMinutes(30);
 
         // ===== Cycle-time PLAN (sir: % plan ke hisaab se, cycle-time se - previous day se NAHI) =====
-        // Per-line cycle time (sec/engine). appsettings "CycleTimes" se override, warna default.
-        private int Cyc(string line, int def) => _config.GetValue<int?>($"CycleTimes:{line}") ?? def;
+        // Per-line cycle time (sec/engine) ab Oracle (TCL_T_CYCLETIME) se aata - CycleTimeService dekho.
 
         // Breaks (IST clock) - plan production me ye time nahi gina jaata (sir ne diye).
         private static readonly (TimeSpan start, TimeSpan end)[] Breaks =
@@ -174,12 +176,10 @@ namespace CMES.Controllers
             }
         }
 
-        // GET /api/Dashboard/overview?date=2026-06-10&cycOld=150&cycNew=140&cycTest=180&cycPaint=180
-        // cyc* optional: UI se cycle-time bheja to plan usse, warna appsettings/default se. (live refresh isi ko hit karta hain)
+        // GET /api/Dashboard/overview?date=2026-06-10
+        // Cycle-time Oracle se (read-only) - UI se nahi aata. (live refresh isi ko hit karta hain)
         [HttpGet("overview")]
-        public async Task<IActionResult> Overview([FromQuery] string? date = null,
-            [FromQuery] int? cycOld = null, [FromQuery] int? cycNew = null,
-            [FromQuery] int? cycTest = null, [FromQuery] int? cycPaint = null)
+        public async Task<IActionResult> Overview([FromQuery] string? date = null)
         {
             (DateTime min, DateTime max)? range;
             try { range = await GetRangeAsync(); }
@@ -259,11 +259,12 @@ namespace CMES.Controllers
             var effNow = nowIst < dayStartIst ? dayStartIst : (nowIst > dayEndIst ? dayEndIst : nowIst);
             var workSec = (effNow - dayStartIst).TotalSeconds - BreakSeconds(dayStartIst, effNow);
 
-            // Cycle = UI se aaya (>0) to wahi, warna appsettings/default. Plan inhi se banta.
-            int cOld = (cycOld > 0 ? cycOld.Value : Cyc("OldLine", 150));
-            int cNew = (cycNew > 0 ? cycNew.Value : Cyc("NewLine", 140));
-            int cTest = (cycTest > 0 ? cycTest.Value : Cyc("TestCell", 180));
-            int cPaint = (cycPaint > 0 ? cycPaint.Value : Cyc("PaintLine", 180));
+            // Cycle = Oracle (TCL_T_CYCLETIME) se, admin-managed read-only. Local pe fallback defaults. Plan inhi se banta.
+            var cyc = await _cycle.GetAsync();
+            int cOld = cyc["OldLine"];
+            int cNew = cyc["NewLine"];
+            int cTest = cyc["TestCell"];
+            int cPaint = cyc["PaintLine"];
             int oPlan = PlanCount(workSec, cOld);
             int nPlan = PlanCount(workSec, cNew);
             int tPlan = PlanCount(workSec, cTest);
