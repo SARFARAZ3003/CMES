@@ -179,7 +179,7 @@ async function fetchLocations() {
  *   productId   → modelNo        (raw PRODUCTID until PRODUCT join is added)
  *   workOrderNo → jobOrderNo
  */
-async function fetchDetails(location, page = 1, pageSize = 100) {
+async function fetchDetails(location, page = 1, pageSize = 500) {
   const slug = location ? (LOCATION_SLUGS[location.toUpperCase()] ?? location) : null
   const base = slug ? `/api/wip/details/${slug}` : '/api/wip/details'
   const url  = `${base}?page=${page}&pageSize=${pageSize}`

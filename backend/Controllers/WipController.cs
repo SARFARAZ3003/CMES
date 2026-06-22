@@ -20,8 +20,9 @@ namespace CMES.Controllers
         // SERIALNO / WORKORDERNO / STATUS / CREATEDON and does NOT have WORKSTATION,
         // LOCATION, PRODUCTID, or LASTUPDATEON.
         private const string WipBaseSql = @"
-    dbo.MPI_COB_T_SERIAL_NO_HISTORY C
-    WHERE C.STATUS   IN (1, 2, 6)
+    dbo.MPI_COB_T_SERIAL_NO C
+    LEFT JOIN dbo.MPI_PRODUCT P ON P.ID = C.PRODUCTID
+    WHERE  C.STATUS   IN (1, 2, 6)
     AND LEN(C.SERIALNO) = 8
     AND C.CREATEDON    >= '2025-08-01'";
 
@@ -227,7 +228,7 @@ END";
         public async Task<IActionResult> GetDetails(
             string?           location = null,
             [FromQuery] int   page     = 1,
-            [FromQuery] int   pageSize = 100,
+            [FromQuery] int   pageSize = 500,
             CancellationToken ct       = default)
         {
             pageSize = Math.Clamp(pageSize, 1, 500);
@@ -369,7 +370,7 @@ FROM   {WipBaseSql}
                 pageCmd.CommandText = $@"
 SELECT
     C.SERIALNO                  AS SerialNo,
-    C.PRODUCTID                 AS ProductId,
+    P.PRODUCTNO                 AS ProductId,
     C.WORKORDERNO               AS WorkOrderNo,
     C.WORKSTATION               AS Workstation,
     CASE C.STATUS

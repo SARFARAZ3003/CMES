@@ -214,7 +214,7 @@
 
 /* Monospaced cells — timestamps, serial numbers, workorders */
 .wip-mono {
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: 'Tahoma', 'Courier New', monospace;
   font-size: 11.5px;
   color: #37474F;   /* dark blue-grey — readable but visually distinct from labels */
 }
