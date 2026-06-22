@@ -288,6 +288,8 @@ export default function WipReport() {
   const [detailRows, setDetailRows]         = useState([])
   const [detailLoading, setDetailLoading]   = useState(true)
   const [detailError, setDetailError]       = useState(null)
+  const [detailPage, setDetailPage]         = useState(1)
+  const [detailTotalPages, setDetailTotalPages] = useState(1)
 
   const today = new Date().toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -303,20 +305,26 @@ export default function WipReport() {
       .finally(() => setSummaryLoading(false))
   }, [])
 
-  // Reload details whenever selectedLocation changes — GET /api/wip/details/{location}
+  // Reload details whenever selectedLocation or detailPage changes
   const loadDetails = useCallback(() => {
     setDetailLoading(true)
     setDetailError(null)
-    fetchDetails(selectedLocation)
-      .then(({ items }) => setDetailRows(items))
+    fetchDetails(selectedLocation, detailPage)
+      .then(({ items, totalCount }) => {
+        setDetailRows(items)
+        setDetailTotalPages(Math.max(1, Math.ceil(totalCount / 100)))
+      })
       .catch(err => setDetailError(err.message))
       .finally(() => setDetailLoading(false))
-  }, [selectedLocation])
+  }, [selectedLocation, detailPage])
 
   useEffect(() => { loadDetails() }, [loadDetails])
 
-  const handleRowClick = (location) =>
+  // Reset to page 1 whenever the selected location changes
+  const handleRowClick = (location) => {
+    setDetailPage(1)
     setSelectedLocation(prev => (prev === location ? null : location))
+  }
 
   const totalWip = summary.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
   const activeLocations = summary.filter(row => Number(row.quantity ?? 0) > 0).length
@@ -373,7 +381,7 @@ export default function WipReport() {
               <div className="wip-panel-title">
                 WIP Summary
                 {selectedLocation && (
-                  <button className="wip-clear-btn" onClick={() => setSelectedLocation(null)}>
+                  <button className="wip-clear-btn" onClick={() => { setDetailPage(1); setSelectedLocation(null) }}>
                     Clear ✕
                   </button>
                 )}
@@ -493,8 +501,31 @@ export default function WipReport() {
                     </tbody>
                   </table>
                 )}
-              </div>
-            </div>
+              </div>{/* /wip-table-wrap */}
+
+              {/* Pager — only shown when there is more than one page */}
+              {!detailLoading && detailTotalPages > 1 && (
+                <div className="wip-pager">
+                  <button
+                    className="wip-pager-btn"
+                    onClick={() => setDetailPage(p => Math.max(1, p - 1))}
+                    disabled={detailPage <= 1}
+                  >
+                    ‹ Prev
+                  </button>
+                  <span className="wip-pager-info">
+                    Page {detailPage} of {detailTotalPages}
+                  </span>
+                  <button
+                    className="wip-pager-btn"
+                    onClick={() => setDetailPage(p => Math.min(detailTotalPages, p + 1))}
+                    disabled={detailPage >= detailTotalPages}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              )}
+            </div>{/* /wip-right */}
 
           </div>{/* /wip-panels */}
         </div>{/* /dash-content */}
