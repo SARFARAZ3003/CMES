@@ -91,17 +91,33 @@ namespace CMES.Controllers
             .ToList();
 
             // ---- Daily (har din distinct engines) ----
-            var pairs = await table
-                .Where(x => x.CreatedOn != null && x.SerialNo != null)
-                .Select(x => new { D = x.CreatedOn!.Value.Date, x.SerialNo })
-                .Distinct()
-                .ToListAsync();
+            // Ek hi GROUP BY query — har din ke liye sirf 1 row. Pehle poori history ke
+            // (date, serial) distinct pairs memory mein aate the (lakhs of rows); ab
+            // DB hi WHERE se filter karke seedha count karta hai.
+            var daily = new List<object>();
+            {
+                var conn = _db.Database.GetDbConnection();
+                if (conn.State != System.Data.ConnectionState.Open)
+                    conn.Open();
 
-            var daily = pairs
-                .GroupBy(p => p.D)
-                .Select(grp => new { date = grp.Key.ToString("dd MMM"), engines = grp.Count() })
-                .OrderBy(x => x.date)
-                .ToList();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+SELECT   CAST(C.CREATEDON AS date) AS D,
+         COUNT(DISTINCT C.SERIALNO) AS Engines
+FROM     dbo.MPI_COB_T_SERIAL_NO_HISTORY C
+WHERE    C.CREATEDON IS NOT NULL
+  AND    C.SERIALNO  IS NOT NULL
+GROUP BY CAST(C.CREATEDON AS date)
+ORDER BY CAST(C.CREATEDON AS date);";
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var d = reader.GetDateTime(0);
+                    var engines = Convert.ToInt32(reader.GetValue(1));
+                    daily.Add(new { date = d.ToString("dd MMM"), engines });
+                }
+            }
 
             return Ok(new
             {

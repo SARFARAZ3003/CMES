@@ -21,9 +21,9 @@ namespace CMES.Controllers
         // LOCATION, PRODUCTID, or LASTUPDATEON.
         private const string WipBaseSql = @"
     dbo.MPI_COB_T_SERIAL_NO_HISTORY C
-WHERE C.STATUS   IN (1, 2, 6)
-  AND LEN(C.SERIALNO) = 8
-  AND C.CREATEDON    >= '2025-08-01'";
+    WHERE C.STATUS   IN (1, 2, 6)
+    AND LEN(C.SERIALNO) = 8
+    AND C.CREATEDON    >= '2025-08-01'";
 
         // ── Location derivation — faithful port of the Oracle CASE expression ──
         //
@@ -264,35 +264,19 @@ END";
         // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Runs one COUNT(DISTINCT SERIALNO) query per category in parallel.
-        /// Each query uses a targeted WHERE predicate so SQL Server can use
-        /// the existing indexes on WORKSTATION, LOCATION, STATUS, and CREATEDON.
+        /// Returns DISTINCT-serial counts for every category in a SINGLE query.
+        /// One pass over the table: derive each row's location with the SAME CASE
+        /// the details endpoint uses, filter once via WipBaseSql, then
+        /// COUNT(DISTINCT SERIALNO) per group. Replaces the old 16-queries-in-parallel
+        /// approach (16 connections + 16 scans) and keeps the location cards exactly
+        /// consistent with the details grid.
         /// </summary>
         private async Task<Dictionary<string, long>> FetchCategoryCountsAsync(CancellationToken ct)
         {
-            // Build one task per category
-            var tasks = Categories.Select(cat => CountCategoryAsync(cat.Name, ct)).ToList();
-            await Task.WhenAll(tasks);
-
-            var result = new Dictionary<string, long>(Categories.Length);
-            for (var i = 0; i < Categories.Length; i++)
-                result[Categories[i].Name] = tasks[i].Result;
-
-            return result;
-        }
-
-        /// <summary>
-        /// Counts DISTINCT SERIALNOs in one category using a targeted predicate
-        /// instead of the derived CASE expression, so the query is index-friendly.
-        /// </summary>
-        private async Task<long> CountCategoryAsync(string categoryName, CancellationToken ct)
-        {
-            var predicate = BuildCategoryPredicate(categoryName);
-            if (predicate is null)
-            {
-                _logger.LogDebug("[WipController] CountCategory: no predicate for '{Category}', returning 0.", categoryName);
-                return 0L;
-            }
+            // Seed every known category at 0 so each card always has a value.
+            var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (_, name) in Categories)
+                result[name] = 0L;
 
             var connectionString = _configuration.GetConnectionString("CMES_DB")!;
             await using var conn = new SqlConnection(connectionString);
@@ -300,112 +284,39 @@ END";
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
-SELECT COUNT(DISTINCT C.SERIALNO)
-FROM   {WipBaseSql}
-  AND  ({predicate});";
+SELECT   Derived.DerivedLocation,
+         COUNT(DISTINCT Derived.SerialNo) AS Cnt
+FROM (
+    SELECT  C.SERIALNO          AS SerialNo,
+            {DeriveLocationSql}  AS DerivedLocation
+    FROM    {WipBaseSql}
+) AS Derived
+GROUP BY Derived.DerivedLocation;";
 
-            _logger.LogDebug("[WipController] CountCategory SQL for '{Category}':\n{Sql}", categoryName, cmd.CommandText);
+            _logger.LogDebug("[WipController] FetchCategoryCounts single-query SQL:\n{Sql}", cmd.CommandText);
             try
             {
-                var scalar = await cmd.ExecuteScalarAsync(ct);
-                var count = scalar is DBNull or null ? 0L : Convert.ToInt64(scalar);
-                _logger.LogDebug("[WipController] CountCategory '{Category}' = {Count}.", categoryName, count);
-                return count;
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    // 'OLDLINE'/'NEWLINE' -> 'OLD LINE'/'NEW LINE'; everything else as-is.
+                    var label = NormalizeOracleLocation(ReadString(reader, "DerivedLocation"));
+                    var cnt   = reader["Cnt"] is DBNull or null ? 0L : Convert.ToInt64(reader["Cnt"]);
+
+                    // Only assign to known categories; stray pass-through locations are ignored.
+                    if (result.ContainsKey(label))
+                        result[label] = cnt;
+                }
             }
             catch (SqlException ex)
             {
-                _logger.LogError(ex, "[WipController] CountCategory SQL error for '{Category}'.", categoryName);
+                _logger.LogError(ex, "[WipController] FetchCategoryCounts SQL error.");
                 throw;
             }
+
+            return result;
         }
-        /// <summary>
-        /// Returns a SQL predicate that matches the SAME rows DeriveLocationSql would
-        /// assign to this category.  Must mirror DeriveLocationSql branch-for-branch
-        /// so that CountCategoryAsync and FetchDetailPageAsync are consistent.
-        ///
-        /// Branch 2 of DeriveLocationSql passes non-null LOCATION through as-is,
-        /// so any record with LOCATION = 'TEST CELL LINE' (for example) gets that
-        /// category — and the predicate here must include that LOCATION check too.
-        /// </summary>
-        private static string? BuildCategoryPredicate(string category) => category switch
-        {
-            // ── WORKSTATION-primary categories ─────────────────────────────────
-            // These have no fixed LOCATION value in the legacy data.
-            // Branch 2 pass-through could still assign them if LOCATION is set,
-            // so include both the LOCATION = exact-name check AND the WORKSTATION range.
-            "LINESET" =>
-                "(C.LOCATION = 'LINESET' OR (C.LOCATION IS NULL AND C.WORKSTATION = '10008'))",
 
-            "LINESET LINE" =>
-                "(C.LOCATION = 'LINESET LINE' OR (C.LOCATION IS NULL AND C.WORKSTATION BETWEEN '10000' AND '13000' AND C.WORKSTATION <> '10008'))",
-
-            // Oracle CASE produces 'OLDLINE' for workstation range when LOCATION IS NULL.
-            // Records with LOCATION = 'OLDLINE' also classify here via branch 2.
-            "OLD LINE" =>
-                "(C.LOCATION = 'OLDLINE' OR (C.LOCATION IS NULL AND C.WORKSTATION BETWEEN '20000' AND '23900'))",
-
-            // Oracle CASE produces 'NEWLINE' for workstation range when LOCATION IS NULL.
-            "NEW LINE" =>
-                "(C.LOCATION = 'NEWLINE' OR (C.LOCATION IS NULL AND (C.WORKSTATION BETWEEN '30000' AND '33200' OR C.WORKSTATION = 'TC1CMW101MINIE1')))",
-
-            // TEST CELL LINE: LOCATION-stored value OR WORKSTATION range.
-            "TEST CELL LINE" =>
-                "(C.LOCATION = 'TEST CELL LINE' OR (C.LOCATION IS NULL AND C.WORKSTATION BETWEEN '40000' AND '44600'))",
-
-            // PAINT LINE: LOCATION-stored value OR WORKSTATION range.
-            "PAINT LINE" =>
-                "(C.LOCATION = 'PAINT LINE' OR (C.LOCATION IS NULL AND C.WORKSTATION BETWEEN '50000' AND '51905'))",
-
-            // ── LOCATION-primary categories ────────────────────────────────────
-            // These are assigned via LOCATION column (branch 2 pass-through)
-            // OR via specific WORKSTATION values when LOCATION IS NULL.
-            "PAINT REPAIR" =>
-                "(C.LOCATION = 'PAINT REPAIR' OR (C.LOCATION IS NULL AND C.WORKSTATION = '54000'))",
-
-            "QUALITY DOCK" =>
-                "(C.LOCATION = 'QUALITY DOCK' OR (C.LOCATION IS NULL AND C.WORKSTATION IN ('52000','52100','52200','55000')))",
-
-            // NEWLINE LOOP: branch 1 override (ATP REPAIR), or branch 2 pass-through,
-            // or workstation when LOCATION IS NULL.
-            "NEWLINE LOOP" =>
-                "(C.LOCATION = 'ATP REPAIR' OR C.LOCATION = 'NEWLINE LOOP' OR (C.LOCATION IS NULL AND C.WORKSTATION IN ('33300','33400')))",
-
-            "MRA" =>
-                "(C.LOCATION = 'MRA' OR (C.LOCATION IS NULL AND C.WORKSTATION = '34000'))",
-
-            // ── Override-only categories (no WORKSTATION rule) ─────────────────
-            "TEST REWORK" =>
-                "(C.LOCATION = 'BLB REPAIR' OR C.LOCATION = 'TEST REWORK')",
-
-            "SHORT BUILD" =>
-                "(C.LOCATION = 'PART SHORTAGE' OR C.LOCATION = 'SHORT BUILD')",
-
-            // ── LOCATION pass-through categories (EQA AUDIT, PE) ──────────────
-            // These exist only via branch 2 — records where LOCATION = these values.
-            "EQA AUDIT" =>
-                "C.LOCATION = 'EQA AUDIT'",
-
-            "PE" =>
-                "C.LOCATION = 'PE'",
-
-            "R12 LINESET" =>
-                "(C.LOCATION = 'R12 LINESET' OR (C.LOCATION IS NULL AND C.WORKSTATION BETWEEN '90000' AND '99999'))",
-
-            // UNKNOWN: everything that does not match any branch above.
-            // Approximated as: LOCATION IS NULL AND WORKSTATION not in any known range.
-            // This is deliberately loose — exact UNKNOWN count is hard without full CASE eval.
-            "UNKNOWN" =>
-                @"(C.LOCATION IS NULL
-                AND C.WORKSTATION NOT IN ('10008','TC1CMW101MINIE1','34000','54000')
-                AND C.WORKSTATION NOT BETWEEN '10000' AND '13000'
-                AND C.WORKSTATION NOT BETWEEN '20000' AND '23900'
-                AND C.WORKSTATION NOT BETWEEN '30000' AND '33200'
-                AND C.WORKSTATION NOT BETWEEN '40000' AND '44600'
-                AND C.WORKSTATION NOT BETWEEN '50000' AND '51905'
-                AND C.WORKSTATION NOT IN ('52000','52100','52200','55000','33300','33400'))",
-
-            _ => null,
-        };
 
         /// <summary>
         /// Fetches one page of detail rows for a given canonical location.
