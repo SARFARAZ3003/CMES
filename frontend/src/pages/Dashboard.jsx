@@ -124,7 +124,7 @@ const ChartWithAvg = ({ data, xKey, xLabel, type, height = 300, visible, avgUnit
 )
 
 // Kaunse hours kis shift mein (IST). Per-shift hourly graph ke liye.
-export default function Dashboard({ user, onLogout }) {
+export default function Dashboard({ user, onLogout, page, onNavigate }) {
   const [activeTab, setActiveTab] = useState('hourly')
   const [chartType, setChartType] = useState('line') // 'line' | 'bar' - sab graphs pe
   // Kaunse series dikhane hain (checkbox se toggle). Default sab.
@@ -207,7 +207,7 @@ export default function Dashboard({ user, onLogout }) {
 
   return (
     <div className="dash-root">
-      <Sidebar user={user} onLogout={onLogout} />
+      <Sidebar user={user} onLogout={onLogout} page={page} onNavigate={onNavigate} />
       <div className="dash-main">
 
         {/* Top Bar */}

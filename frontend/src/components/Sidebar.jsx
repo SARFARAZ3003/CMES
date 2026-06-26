@@ -1,7 +1,8 @@
 import './Sidebar.css'
 
 // User aata hain Windows Integrated Auth se (/api/auth/me).
-export default function Sidebar({ user, onLogout }) {
+// page + onNavigate se Production Dash / WIP Report ke beech switch hota.
+export default function Sidebar({ user, onLogout, page = 'dashboard', onNavigate }) {
   const name = user?.fullName || user?.username || 'User'
   const username = user?.username || ''
   const role = user?.role || ''
@@ -27,9 +28,19 @@ export default function Sidebar({ user, onLogout }) {
 
       {/* Nav */}
       <nav className="sidebar-nav">
-        <div className="sidebar-link active">
+        <div
+          className={`sidebar-link ${page === 'dashboard' ? 'active' : ''}`}
+          onClick={() => onNavigate?.('dashboard')}
+        >
           <span className="sidebar-icon">📊</span>
           <span>Production Dash</span>
+        </div>
+        <div
+          className={`sidebar-link ${page === 'wip' ? 'active' : ''}`}
+          onClick={() => onNavigate?.('wip')}
+        >
+          <span className="sidebar-icon">📋</span>
+          <span>WIP Report</span>
         </div>
       </nav>
 

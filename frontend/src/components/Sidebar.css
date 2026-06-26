@@ -95,6 +95,7 @@
   font-size: 13px;
   transition: all 0.15s;
   border-left: 3px solid transparent;
+  cursor: pointer;
 }
 
 .sidebar-link:hover {

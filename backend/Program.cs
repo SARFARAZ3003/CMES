@@ -84,10 +84,15 @@ var app = builder.Build();
     catch (Exception ex) { slog.LogError(ex, "[CMES-DB-FAIL] AUTH_DB connect FAILED -> {Msg}", ex.Message); }
 }
 
+// React build (wwwroot) serve karo - IIS pe same-origin SPA.
+app.UseDefaultFiles();     // '/' -> wwwroot/index.html
+app.UseStaticFiles();      // wwwroot ke assets (js/css)
+
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors("AllowReactApp");
 app.UseAuthentication();   // Windows identity resolve
 app.UseAuthorization();
 app.MapControllers();
+app.MapFallbackToFile("index.html");   // SPA client routes -> index.html (API routes pehle match hote)
 app.Run();
