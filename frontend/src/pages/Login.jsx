@@ -13,7 +13,7 @@ export default function Login() {
     setLoading(true)
     // Later: call ASP.NET API here for AD validation
     setTimeout(() => {
-      navigate('/dashboard')
+      navigate('/production-report')
     }, 1000)
   }
 

@@ -1,0 +1,183 @@
+/* ─── ModelTracking.css ──────────────────────────────────────────────────── */
+
+/* ── Search bar ── */
+.mt-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.mt-search-label {
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.mt-search-input {
+  min-width: 240px;
+  max-width: 340px;
+}
+
+.mt-search-btn {
+  padding: 8px 22px;
+  background: #8B0000;
+  border: 1px solid #8B0000;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.mt-search-btn:hover  { background: #a50000; }
+.mt-search-btn:active { background: #6b0000; }
+
+.mt-clear-btn {
+  padding: 7px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mt-clear-btn:hover {
+  background: rgba(139,0,0,0.3);
+  border-color: #8B0000;
+  color: #fff;
+}
+
+.mt-filter-chip {
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  background: rgba(139,0,0,0.14);
+  border: 1px solid rgba(139,0,0,0.35);
+  border-radius: 5px;
+  padding: 5px 12px;
+}
+
+.mt-filter-chip strong {
+  color: rgba(255,255,255,0.9);
+}
+
+/* ── Tab switcher ── */
+.mt-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.mt-tab {
+  padding: 10px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+
+.mt-tab:hover       { color: rgba(255,255,255,0.85); }
+.mt-tab--active     { color: #fff; border-bottom-color: #8B0000; }
+
+/* ── Scrollable table wrapper ── */
+.mt-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 520px;
+}
+
+.mt-scroll-wrap::-webkit-scrollbar        { width: 7px; height: 7px; }
+.mt-scroll-wrap::-webkit-scrollbar-track  { background: #1e1e1e; }
+.mt-scroll-wrap::-webkit-scrollbar-thumb  { background: rgba(139,0,0,0.55); border-radius: 4px; }
+.mt-scroll-wrap::-webkit-scrollbar-thumb:hover { background: rgba(139,0,0,0.85); }
+
+.mt-scroll-wrap .report-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* ── Count label above table ── */
+.mt-count-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.45);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+/* ── Model column — stand-out weight and brightness ── */
+.mt-model-cell {
+  font-weight: 700;
+  color: #fff !important;
+  white-space: nowrap;
+}
+
+/* ── Numeric cells in summary table ── */
+.mt-nonzero {
+  color: #FFB74D;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+.mt-zero {
+  color: rgba(255,255,255,0.25);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── TOTAL row ── */
+.mt-total-row td {
+  background: #2a2a2a !important;
+  border-top: 2px solid #8B0000 !important;
+  color: #fff !important;
+  font-size: 14px;
+}
+
+/* ── Empty state inside table ── */
+.mt-empty {
+  text-align: center;
+  padding: 40px !important;
+  color: rgba(255,255,255,0.3) !important;
+  font-size: 14px;
+}
+
+/* ── Monospace for codes / timestamps ── */
+.mt-mono {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+}
+
+/* ── Status badge in details table ── */
+.mt-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .mt-search-bar  { flex-direction: column; align-items: flex-start; }
+  .mt-search-input { max-width: 100%; }
+  .mt-tabs        { overflow-x: auto; }
+}

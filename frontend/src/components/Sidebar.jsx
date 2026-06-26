@@ -3,11 +3,8 @@ import { currentUser } from '../data/mockData'
 import './Sidebar.css'
 
 const navItems = [
-  { path: '/dashboard',         label: 'Production Dash',  icon: '📊' },
-  { path: '/production-report', label: 'Production Report',icon: '📋' },
-  { path: '/wip-report',        label: 'WIP Report',       icon: '🔄' },
-  { path: '/model-tracking',    label: 'Model Tracking',   icon: '🔍' },
-  { path: '/inventory',         label: 'Inventory',        icon: '📦' },
+  { path: '/production-report', label: 'Production Report', icon: '📋' },
+  { path: '/model-tracking',    label: 'Model Tracking',    icon: '🔍' },
 ]
 
 export default function Sidebar() {

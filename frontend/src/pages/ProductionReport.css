@@ -1,0 +1,215 @@
+/* ─── ProductionReport.css ─────────────────────────────────────────────────── */
+
+/* ── Date bar (top-right of topbar) ── */
+.pr-date-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pr-date-label {
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.pr-date-input {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  color: #fff;
+  font-size: 13px;
+  padding: 7px 12px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  color-scheme: dark;
+}
+
+.pr-date-input:focus { border-color: #8B0000; }
+
+/* ── Shared query / action button ── */
+.pr-query-btn {
+  padding: 8px 22px;
+  background: #8B0000;
+  border: 1px solid #8B0000;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.pr-query-btn:hover  { background: #a50000; }
+.pr-query-btn:active { background: #6b0000; }
+
+/* ── KPI strip — 4 cards, 2 metrics each ── */
+.pr-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.pr-kpi-card {
+  background: #222;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-top: 4px solid;
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+
+.pr-kpi-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 14px;
+}
+
+.pr-kpi-body {
+  display: flex;
+  align-items: center;
+}
+
+.pr-kpi-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.pr-kpi-val {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-kpi-sub {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+
+.pr-kpi-divider {
+  width: 1px;
+  height: 52px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
+/* ── Tab switcher ── */
+.pr-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pr-tab {
+  padding: 10px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+
+.pr-tab:hover    { color: rgba(255,255,255,0.85); }
+.pr-tab--active  { color: #fff; border-bottom-color: #8B0000; }
+
+/* ── Scrollable table wrapper ── */
+.pr-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.pr-scroll-wrap::-webkit-scrollbar        { width: 7px; height: 7px; }
+.pr-scroll-wrap::-webkit-scrollbar-track  { background: #1e1e1e; }
+.pr-scroll-wrap::-webkit-scrollbar-thumb  { background: rgba(139,0,0,0.55); border-radius: 4px; }
+.pr-scroll-wrap::-webkit-scrollbar-thumb:hover { background: rgba(139,0,0,0.85); }
+
+.pr-scroll-wrap .report-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* ── Monospace text ── */
+.mono {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+}
+
+/* ── Engine info panel ── */
+.pr-engine-info {
+  background: #222;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-left: 4px solid #8B0000;
+  border-radius: 8px;
+  padding: 18px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 48px;
+}
+
+.pr-engine-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.pr-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.45);
+  font-weight: 600;
+}
+
+.pr-info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .pr-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .pr-kpi-val { font-size: 34px; }
+
+  .dash-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .pr-date-bar { width: 100%; }
+  .pr-tabs     { overflow-x: auto; }
+}
+
+@media (max-width: 500px) {
+  .pr-kpi-row { grid-template-columns: 1fr 1fr; }
+  .pr-kpi-val { font-size: 28px; }
+}

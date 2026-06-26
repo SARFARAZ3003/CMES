@@ -1,39 +1,49 @@
-/* Shared styling for Production Report, WIP, Model Tracking, Inventory pages.
-   Dashboard.css ke saath same dark theme follow karta hain. */
+/* Reports.css — shared table, state, pagination, and control styles */
 
-/* Data table */
+/* ── Data table container ── */
 .report-table-box {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
   overflow: hidden;
 }
 
+/* ── Table base ── */
 .report-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .report-table thead th {
   background: #8B0000;
   color: #fff;
   text-align: left;
-  padding: 10px 14px;
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.4px;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
 .report-table tbody td {
-  padding: 10px 14px;
-  color: rgba(255, 255, 255, 0.8);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 11px 16px;
+  color: rgba(255,255,255,0.92);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 14px;
 }
 
-.report-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+.report-table tbody tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+
+/* Alternating row tint for readability */
+.report-table tbody tr:nth-child(even) td {
+  background: rgba(255,255,255,0.025);
+}
+
+.report-table tbody tr:nth-child(even):hover td {
+  background: rgba(255,255,255,0.05);
 }
 
 .report-table .num {
@@ -41,25 +51,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Status pills */
+/* ── Status pills ── */
 .pill {
   display: inline-block;
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.3px;
 }
 
-.pill-ok       { background: rgba(76, 175, 80, 0.18);  color: #7ED884; }
+.pill-ok       { background: rgba(76, 175, 80, 0.18);  color: #81C784; }
 .pill-low      { background: rgba(255, 152, 0, 0.18);  color: #FFB74D; }
-.pill-out      { background: rgba(244, 67, 54, 0.18);  color: #EF7A70; }
+.pill-out      { background: rgba(244, 67, 54, 0.18);  color: #EF9A9A; }
 .pill-wip      { background: rgba(33, 150, 243, 0.18); color: #64B5F6; }
 .pill-fes      { background: rgba(255, 152, 0, 0.18);  color: #FFB74D; }
 .pill-testok   { background: rgba(156, 39, 176, 0.20); color: #CE93D8; }
-.pill-dispatch { background: rgba(244, 67, 54, 0.18);  color: #EF7A70; }
+.pill-dispatch { background: rgba(244, 67, 54, 0.18);  color: #EF9A9A; }
 
-/* Search / filter bar */
+/* ── Search / filter bar ── */
 .report-toolbar {
   display: flex;
   align-items: center;
@@ -69,45 +79,47 @@
 }
 
 .report-search {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #252525;
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 6px;
-  padding: 8px 14px;
+  padding: 9px 14px;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   min-width: 240px;
   outline: none;
+  transition: border-color 0.15s;
 }
 
-.report-search::placeholder { color: rgba(255, 255, 255, 0.3); }
-.report-search:focus { border-color: #8B0000; }
+.report-search::placeholder { color: rgba(255,255,255,0.35); }
+.report-search:focus { border-color: #8B0000; background: #2a2a2a; }
 
-/* Loading / error / empty states */
+/* ── Loading / error / empty states ── */
 .report-state {
-  padding: 40px;
+  padding: 48px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
 }
 
-.report-state.error { color: #EF7A70; }
+.report-state.error { color: #EF9A9A; }
 
-/* Pagination */
+/* ── Pagination ── */
 .report-pager {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 .pager-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.75);
-  padding: 7px 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.85);
+  padding: 8px 20px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -119,33 +131,33 @@
 }
 
 .pager-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .pager-info {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Model Tracking view toggle ─────────────────────────────────────────── */
+/* ── Toggle buttons (used by Model Tracking) ── */
 .mt-view-toggle {
   display: flex;
   gap: 6px;
   margin-bottom: 16px;
-  flex-wrap: wrap;          /* stays visible on narrow screens */
+  flex-wrap: wrap;
 }
 
 .mt-toggle-btn {
-  padding: 7px 20px;
+  padding: 8px 22px;
   background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 999px;
-  color: rgba(255,255,255,0.5);
-  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
@@ -153,7 +165,7 @@
 
 .mt-toggle-btn:hover {
   background: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.9);
 }
 
 .mt-toggle-active {

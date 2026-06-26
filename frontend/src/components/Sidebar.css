@@ -63,16 +63,16 @@
 
 .sidebar-user-name {
   color: #fff;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .sidebar-user-meta {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
   margin-top: 2px;
 }
 
@@ -89,21 +89,21 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 18px;
-  color: rgba(255, 255, 255, 0.55);
+  padding: 11px 18px;
+  color: rgba(255, 255, 255, 0.65);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   transition: all 0.15s;
   border-left: 3px solid transparent;
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .sidebar-link.active {
-  background: rgba(139, 0, 0, 0.25);
+  background: rgba(139, 0, 0, 0.28);
   color: #fff;
   border-left: 3px solid #8B0000;
 }
@@ -121,12 +121,12 @@
 
 .sidebar-logout {
   width: 100%;
-  padding: 9px;
+  padding: 10px;
   background: rgba(139, 0, 0, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(139, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(139, 0, 0, 0.45);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.15s;
   text-align: left;
