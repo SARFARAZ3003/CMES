@@ -5,52 +5,67 @@ using System.Data;
 
 namespace CMES.Controllers
 {
-    /// <summary>
-    /// Production Report API.
-    ///
-    /// Three endpoints match the frontend data contracts exactly:
-    ///   GET /api/productionreport/kpis?date=YYYY-MM-DD
-    ///   GET /api/productionreport/fes?date=YYYY-MM-DD&amp;page=1&amp;pageSize=20
-    ///   GET /api/productionreport/engine-history?esn=&lt;ESN&gt;&amp;page=1&amp;pageSize=15
-    ///
-    /// SQL is intentionally absent from this skeleton.
-    /// Each action method contains a clearly marked TODO block showing
-    /// exactly where the SQL query goes, following the ModelTrackingController pattern.
-    ///
-    /// Architecture (same as ModelTrackingController):
-    ///   - Filter in SQL, not in C#.
-    ///   - Join only required tables.
-    ///   - Aggregate (COUNT, SUM, GROUP BY) inside SQL.
-    ///   - OFFSET/FETCH pagination inside SQL.
-    ///   - Parameterised queries — no string concatenation.
-    ///   - Common SQL fragments extracted into private const strings.
-    /// </summary>
     [ApiController]
     [Route("api/productionreport")]
     public class ProductionReportController : ControllerBase
     {
         // ── Dependencies ──────────────────────────────────────────────────────
-        private readonly CmesDbContext                    _db;
-        private readonly IConfiguration                  _configuration;
+        private readonly CmesDbContext                       _db;
+        private readonly IConfiguration                      _configuration;
         private readonly ILogger<ProductionReportController> _logger;
 
-        // ── SQL fragment placeholders (fill in when implementing queries) ──────
-        //
-        // These will mirror the pattern used in ModelTrackingController:
-        //
-        //   private const string ProdBaseSql = @"
-        //       dbo.<source_table> C
-        //   WHERE C.STATUS IN (...)
-        //     AND C.CREATEDON = @date";
-        //
-        //   private const string DeriveShiftSql = @"
-        //   CASE
-        //       WHEN DATEPART(HOUR, C.CREATEDON) BETWEEN 6  AND 13 THEN 'A'
-        //       WHEN DATEPART(HOUR, C.CREATEDON) BETWEEN 14 AND 21 THEN 'B'
-        //       ELSE 'C'
-        //   END";
-        //
-        // Add more reusable fragments here as the business logic is clarified.
+        // ── Base filter ───────────────────────────────────────────────────────
+        // All production queries share this FROM + WHERE fragment.
+        // @date must be supplied by every query that uses it.
+        // Records with 8-char serials on the given date — same table as WipController.
+        private const string ProdBaseSql = @"
+    dbo.MPI_COB_T_SERIAL_NO_HISTORY C
+WHERE LEN(C.SERIALNO) = 8
+  AND CAST(C.CREATEDON AS date) = @date";
+
+        // ── Shift derivation ──────────────────────────────────────────────────
+        // Derived from CREATEDON hour.  Used wherever shift-level breakdown needed.
+        //   A: 06:00–13:59  B: 14:00–21:59  C: 22:00–05:59
+        private const string DeriveShiftSql = @"
+CASE
+    WHEN DATEPART(HOUR, C.CREATEDON) BETWEEN 6  AND 13 THEN 'A'
+    WHEN DATEPART(HOUR, C.CREATEDON) BETWEEN 14 AND 21 THEN 'B'
+    ELSE 'C'
+END";
+
+        // ── Status derivation ─────────────────────────────────────────────────
+        // Matches the Oracle DECODE used in the legacy application.
+        // TODO: confirm status codes against the production schema.
+        private const string DeriveStatusSql = @"
+CASE C.STATUS
+    WHEN 1 THEN 'IN-PROD'
+    WHEN 2 THEN 'ISSUE'
+    WHEN 6 THEN 'IN REPAIR'
+    ELSE        'UNKNOWN'
+END";
+
+        // ── Location derivation ───────────────────────────────────────────────
+        // Faithful port of the Oracle CASE from WipController.
+        // Branch 2 (LOCATION IS NOT NULL pass-through) is essential — do not reorder.
+        private const string DeriveLocationSql = @"
+CASE
+    WHEN C.LOCATION = 'ATP REPAIR'    THEN 'NEWLINE LOOP'
+    WHEN C.LOCATION = 'BLB REPAIR'    THEN 'TEST REWORK'
+    WHEN C.LOCATION = 'PART SHORTAGE' THEN 'SHORT BUILD'
+    WHEN C.LOCATION IS NOT NULL       THEN C.LOCATION
+    WHEN C.WORKSTATION = '10008'                                   THEN 'LINESET'
+    WHEN C.WORKSTATION BETWEEN '10000' AND '13000'                 THEN 'LINESET LINE'
+    WHEN C.WORKSTATION BETWEEN '20000' AND '23900'                 THEN 'OLDLINE'
+    WHEN C.WORKSTATION BETWEEN '30000' AND '33200'
+      OR C.WORKSTATION = 'TC1CMW101MINIE1'                         THEN 'NEWLINE'
+    WHEN C.WORKSTATION BETWEEN '40000' AND '44600'                 THEN 'TEST CELL LINE'
+    WHEN C.WORKSTATION BETWEEN '50000' AND '51905'                 THEN 'PAINT LINE'
+    WHEN C.WORKSTATION = '54000'                                   THEN 'PAINT REPAIR'
+    WHEN C.WORKSTATION IN ('52000','52100','52200','55000')         THEN 'QUALITY DOCK'
+    WHEN C.WORKSTATION IN ('33300','33400')                        THEN 'NEWLINE LOOP'
+    WHEN C.WORKSTATION = '34000'                                   THEN 'MRA'
+    ELSE 'UNKNOWN'
+END";
 
         public ProductionReportController(
             CmesDbContext db,
@@ -65,15 +80,9 @@ namespace CMES.Controllers
         // ══════════════════════════════════════════════════════════════════════
         // GET /api/productionreport/kpis?date=YYYY-MM-DD
         //
-        // Returns shift-wise and total Quant + FES counts for a given date.
-        //
+        // Shift-wise Quant + FES counts for a given date.
         // Frontend expects:
-        // {
-        //   "shiftA": { "quant": 97,  "fes": 98  },
-        //   "shiftB": { "quant": 41,  "fes": 44  },
-        //   "shiftC": { "quant": 0,   "fes": 0   },
-        //   "total":  { "quant": 138, "fes": 142 }
-        // }
+        //   { shiftA:{quant,fes}, shiftB:{quant,fes}, shiftC:{quant,fes}, total:{quant,fes} }
         // ══════════════════════════════════════════════════════════════════════
         [HttpGet("kpis")]
         public async Task<IActionResult> GetKpis(
@@ -83,66 +92,24 @@ namespace CMES.Controllers
             var parsedDate = TryParseDate(date, out var d) ? d : DateTime.Today;
             _logger.LogInformation("[ProductionReport] GetKpis: date={Date}.", parsedDate.ToString("yyyy-MM-dd"));
 
-            // TODO: Replace this placeholder with a real SQL query.
-            //
-            // Pattern to follow (same as ModelTrackingController.FetchSummaryPageAsync):
-            //
-            //   var cs = _configuration.GetConnectionString("CMES_DB")!;
-            //   await using var conn = new SqlConnection(cs);
-            //   await conn.OpenAsync(ct);
-            //   await using var cmd = conn.CreateCommand();
-            //
-            //   cmd.CommandText = $@"
-            //   WITH ShiftRows AS
-            //   (
-            //       SELECT
-            //           {DeriveShiftSql}   AS Shift,
-            //           C.SERIALNO,
-            //           C.STATUS
-            //       FROM {ProdBaseSql}
-            //   )
-            //   SELECT
-            //       Shift,
-            //       COUNT(DISTINCT CASE WHEN STATUS = 2 THEN SERIALNO END) AS Quant,
-            //       COUNT(DISTINCT CASE WHEN STATUS = 6 THEN SERIALNO END) AS Fes
-            //   FROM ShiftRows
-            //   GROUP BY Shift;";
-            //
-            //   AddParam(cmd, "@date", parsedDate.Date);
-            //   // Read result into ShiftA/B/C then compute Total.
-
-            await Task.CompletedTask; // remove when real async work is added
-
-            return Ok(new
+            try
             {
-                shiftA = new { quant = 0, fes = 0 },
-                shiftB = new { quant = 0, fes = 0 },
-                shiftC = new { quant = 0, fes = 0 },
-                total  = new { quant = 0, fes = 0 },
-            });
+                var result = await FetchKpisAsync(parsedDate, ct);
+                return Ok(result);
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex, "[ProductionReport] GetKpis SQL error.");
+                return StatusCode(500, new { message = "Unable to load KPI summary.", detail = ex.Message });
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════════
         // GET /api/productionreport/fes?date=YYYY-MM-DD&page=1&pageSize=20
         //
-        // Returns paginated FES records for a given date.
-        //
-        // Frontend expects:
-        // {
-        //   "page": 1,
-        //   "pageSize": 20,
-        //   "totalCount": 98,
-        //   "totalPages": 5,
-        //   "items": [
-        //     {
-        //       "sno":        1,
-        //       "esn":        "G4594528",
-        //       "modelNo":    "SO64815",
-        //       "jobOrderNo": "3188771-18",
-        //       "fesDate":    "26-05-2026 06:29:28"
-        //     }
-        //   ]
-        // }
+        // Paginated FES records for a given date.
+        // Frontend expects: { page, pageSize, totalCount, totalPages, items:[...] }
+        // items shape: { sno, esn, modelNo, jobOrderNo, fesDate }
         // ══════════════════════════════════════════════════════════════════════
         [HttpGet("fes")]
         public async Task<IActionResult> GetFes(
@@ -159,81 +126,33 @@ namespace CMES.Controllers
                 "[ProductionReport] GetFes: date={Date} page={Page} pageSize={PageSize}.",
                 parsedDate.ToString("yyyy-MM-dd"), page, pageSize);
 
-            // TODO: Replace this placeholder with real SQL.
-            //
-            // Pattern (same as ModelTrackingController.FetchDetailsPageAsync):
-            //
-            //   // Step 1 — count
-            //   cmd.CommandText = $@"
-            //   SELECT COUNT(DISTINCT C.SERIALNO)
-            //   FROM   {ProdBaseSql}
-            //     AND  C.STATUS = 6      -- FES status
-            //     AND  CAST(C.CREATEDON AS date) = @date;";
-            //   AddParam(cmd, "@date", parsedDate.Date);
-            //   totalCount = ...;
-            //
-            //   // Step 2 — page
-            //   cmd.CommandText = $@"
-            //   SELECT
-            //       ROW_NUMBER() OVER (ORDER BY C.CREATEDON)  AS Sno,
-            //       C.SERIALNO                                AS Esn,
-            //       C.PRODUCTID                               AS ModelNo,
-            //       C.WORKORDERNO                             AS JobOrderNo,
-            //       C.CREATEDON                               AS FesDate
-            //   FROM   {ProdBaseSql}
-            //     AND  C.STATUS = 6
-            //     AND  CAST(C.CREATEDON AS date) = @date
-            //   ORDER  BY C.CREATEDON
-            //   OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;";
-            //   AddParam(cmd, "@date",     parsedDate.Date);
-            //   AddParam(cmd, "@offset",   (page - 1) * pageSize);
-            //   AddParam(cmd, "@pageSize", pageSize);
-
-            await Task.CompletedTask;
-
-            return Ok(new
+            try
             {
-                page,
-                pageSize,
-                totalCount = 0,
-                totalPages = 0,
-                items      = Array.Empty<object>(),
-            });
+                var (rows, totalCount) = await FetchFesPageAsync(parsedDate, page, pageSize, ct);
+                return Ok(new
+                {
+                    page,
+                    pageSize,
+                    totalCount,
+                    totalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+                    items      = rows,
+                });
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex, "[ProductionReport] GetFes SQL error.");
+                return StatusCode(500, new { message = "Unable to load FES records.", detail = ex.Message });
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════════
         // GET /api/productionreport/engine-history?esn=<ESN>&page=1&pageSize=15
         //
-        // Returns engine info + paginated transaction history + ERP subinventory
-        // for a given engine serial number.
-        //
+        // Engine info + paginated transaction history + ERP subinventory.
         // Frontend expects:
-        // {
-        //   "engineInfo": {
-        //     "modelNo":         "SO60341",
-        //     "jobNo":           "3191793-10",
-        //     "currentLocation": "NEWLINE"
-        //   },
-        //   "transactions": {
-        //     "page": 1, "pageSize": 15, "totalCount": 18, "totalPages": 2,
-        //     "items": [
-        //       {
-        //         "initCode":    "FES",
-        //         "orgCode":     "TCL",
-        //         "wipJobNo":    "3187787-1",
-        //         "esn":         "G4594441",
-        //         "actualMsbm":  "S001000",
-        //         "status":      "FES",
-        //         "oracleStatus":"COMPLETE",
-        //         "receivedDate":"23-05-2026 06:10:16",
-        //         "groupId":     55000
-        //       }
-        //     ]
-        //   },
-        //   "erpRows": [
-        //     { "subinventory": "FES", "qty": 267 }
-        //   ]
-        // }
+        //   { engineInfo:{modelNo,jobNo,currentLocation},
+        //     transactions:{page,pageSize,totalCount,totalPages,items:[...]},
+        //     erpRows:[{subinventory,qty}] }
         // ══════════════════════════════════════════════════════════════════════
         [HttpGet("engine-history")]
         public async Task<IActionResult> GetEngineHistory(
@@ -253,47 +172,380 @@ namespace CMES.Controllers
                 "[ProductionReport] GetEngineHistory: esn='{Esn}' page={Page} pageSize={PageSize}.",
                 trimmedEsn, page, pageSize);
 
-            // TODO: Replace this placeholder with three SQL queries:
-            //
-            // Query 1 — engine info (single row lookup):
-            //   SELECT TOP 1
-            //       C.PRODUCTID   AS ModelNo,
-            //       C.WORKORDERNO AS JobNo,
-            //       {DeriveLocationSql} AS CurrentLocation
-            //   FROM dbo.<source_table> C
-            //   WHERE C.SERIALNO = @esn
-            //   ORDER BY C.CREATEDON DESC;
-            //   AddParam(cmd, "@esn", trimmedEsn);
-            //
-            // Query 2 — transaction history (paginated):
-            //   SELECT ... FROM dbo.<txn_table>
-            //   WHERE SERIALNO = @esn
-            //   ORDER BY CREATEDON DESC
-            //   OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
-            //
-            // Query 3 — ERP subinventory (small lookup, no pagination needed):
-            //   SELECT SUBINVENTORY, QTY
-            //   FROM dbo.<erp_table>
-            //   WHERE SERIALNO = @esn;
-
-            await Task.CompletedTask;
-
-            return Ok(new
+            try
             {
-                engineInfo = (object?)null,          // null → frontend shows "No engine found"
+                var result = await FetchEngineHistoryAsync(trimmedEsn, page, pageSize, ct);
+                return Ok(result);
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex, "[ProductionReport] GetEngineHistory SQL error for esn='{Esn}'.", trimmedEsn);
+                return StatusCode(500, new { message = "Unable to load engine history.", detail = ex.Message });
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // Private fetch helpers — one per endpoint, matching WipController style
+        // ══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Single query: derive shift with DeriveShiftSql, filter with ProdBaseSql,
+        /// GROUP BY shift, COUNT(DISTINCT SERIALNO) for Quant and FES.
+        /// No in-memory aggregation. ProdBaseSql and DeriveShiftSql used once each.
+        /// </summary>
+        private async Task<object> FetchKpisAsync(DateTime date, CancellationToken ct)
+        {
+            var cs = _configuration.GetConnectionString("CMES_DB")!;
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync(ct);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"
+WITH ShiftRows AS
+(
+    SELECT
+        {DeriveShiftSql}                                          AS Shift,
+        C.SERIALNO,
+        C.APPLICATION
+    FROM   {ProdBaseSql}
+)
+SELECT
+    Shift,
+    COUNT(DISTINCT SERIALNO)                                          AS Quant,
+    COUNT(DISTINCT CASE WHEN APPLICATION = 'FES' THEN SERIALNO END)  AS Fes
+FROM   ShiftRows
+GROUP  BY Shift;";
+
+            AddParam(cmd, "@date", date.Date);
+            _logger.LogDebug("[ProductionReport] FetchKpis SQL:\n{Sql}", cmd.CommandText);
+
+            int quantA = 0, fesA = 0, quantB = 0, fesB = 0, quantC = 0, fesC = 0;
+
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    var shift = ReadString(reader, "Shift");
+                    var quant = ReadInt(reader, "Quant");
+                    var fes   = ReadInt(reader, "Fes");
+                    switch (shift)
+                    {
+                        case "A": quantA = quant; fesA = fes; break;
+                        case "B": quantB = quant; fesB = fes; break;
+                        case "C": quantC = quant; fesC = fes; break;
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex, "[ProductionReport] FetchKpis SQL error.");
+                throw;
+            }
+
+            _logger.LogInformation(
+                "[ProductionReport] FetchKpis date={Date}: A={QA}/{FA} B={QB}/{FB} C={QC}/{FC}.",
+                date.ToString("yyyy-MM-dd"), quantA, fesA, quantB, fesB, quantC, fesC);
+
+            return new
+            {
+                shiftA = new { quant = quantA, fes = fesA },
+                shiftB = new { quant = quantB, fes = fesB },
+                shiftC = new { quant = quantC, fes = fesC },
+                total  = new { quant = quantA + quantB + quantC, fes = fesA + fesB + fesC },
+            };
+        }
+
+        /// <summary>
+        /// Step 1: COUNT for pagination metadata.
+        /// Step 2: OFFSET/FETCH page — filter first with ProdBaseSql, then select
+        ///         only the columns the frontend actually needs.
+        /// TODO: confirm the FES filter condition (APPLICATION = 'FES' vs STATUS code).
+        /// </summary>
+        private async Task<(List<FesRow> Rows, long TotalCount)> FetchFesPageAsync(
+            DateTime date, int page, int pageSize, CancellationToken ct)
+        {
+            var cs = _configuration.GetConnectionString("CMES_DB")!;
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync(ct);
+
+            // ── Step 1: total count ───────────────────────────────────────────
+            long totalCount;
+            await using (var countCmd = conn.CreateCommand())
+            {
+                // TODO: replace APPLICATION = 'FES' with the correct FES predicate
+                //       once confirmed against the production schema.
+                countCmd.CommandText = $@"
+SELECT COUNT(DISTINCT C.SERIALNO)
+FROM   {ProdBaseSql}
+  AND  C.APPLICATION = 'FES';";
+
+                AddParam(countCmd, "@date", date.Date);
+                _logger.LogDebug("[ProductionReport] FetchFes COUNT SQL (date={Date}):\n{Sql}",
+                    date.ToString("yyyy-MM-dd"), countCmd.CommandText);
+
+                try
+                {
+                    var scalar = await countCmd.ExecuteScalarAsync(ct);
+                    totalCount = scalar is DBNull or null ? 0L : Convert.ToInt64(scalar);
+                    _logger.LogInformation("[ProductionReport] FetchFes total={Count} date={Date}.",
+                        totalCount, date.ToString("yyyy-MM-dd"));
+                }
+                catch (SqlException ex)
+                {
+                    _logger.LogError(ex, "[ProductionReport] FetchFes COUNT SQL error.");
+                    throw;
+                }
+            }
+
+            var rows = new List<FesRow>((int)Math.Min(pageSize, totalCount));
+            if (totalCount == 0) return (rows, 0);
+
+            // ── Step 2: page ──────────────────────────────────────────────────
+            int offset = (page - 1) * pageSize;
+            await using var pageCmd = conn.CreateCommand();
+
+            // TODO: replace C.PRODUCTID with P.PRODUCTNO once PRODUCT table join
+            //       is confirmed available in this database.
+            pageCmd.CommandText = $@"
+SELECT
+    ROW_NUMBER() OVER (ORDER BY C.CREATEDON)  AS Sno,
+    C.SERIALNO                                AS Esn,
+    C.PRODUCTID                               AS ModelNo,
+    C.WORKORDERNO                             AS JobOrderNo,
+    C.CREATEDON                               AS FesDate
+FROM   {ProdBaseSql}
+  AND  C.APPLICATION = 'FES'
+ORDER  BY C.CREATEDON
+OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;";
+
+            AddParam(pageCmd, "@date",     date.Date);
+            AddParam(pageCmd, "@offset",   offset);
+            AddParam(pageCmd, "@pageSize", pageSize);
+
+            _logger.LogDebug("[ProductionReport] FetchFes PAGE SQL page={Page} offset={Offset}.",
+                page, offset);
+
+            try
+            {
+                await using var reader = await pageCmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    rows.Add(new FesRow
+                    {
+                        Sno        = ReadInt(reader,      "Sno"),
+                        Esn        = ReadString(reader,   "Esn"),
+                        ModelNo    = ReadString(reader,   "ModelNo"),
+                        JobOrderNo = ReadString(reader,   "JobOrderNo"),
+                        FesDate    = ReadDateTime(reader, "FesDate"),
+                    });
+                }
+                _logger.LogInformation("[ProductionReport] FetchFes returned {Count} rows page {Page}.",
+                    rows.Count, page);
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex, "[ProductionReport] FetchFes PAGE SQL error.");
+                throw;
+            }
+
+            return (rows, totalCount);
+        }
+
+        /// <summary>
+        /// Three focused queries, each selecting only the columns it needs:
+        ///   1. Engine info   — single row, most recent record for the ESN.
+        ///   2. Transactions  — paginated history rows, OFFSET/FETCH in SQL.
+        ///   3. ERP rows      — small lookup, no pagination needed.
+        ///
+        /// TODO: replace table name placeholders and confirm column names once
+        ///       the transaction and ERP tables are identified in the schema.
+        /// </summary>
+        private async Task<object> FetchEngineHistoryAsync(
+            string esn, int page, int pageSize, CancellationToken ct)
+        {
+            var cs = _configuration.GetConnectionString("CMES_DB")!;
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync(ct);
+
+            // ── Query 1: engine info ──────────────────────────────────────────
+            EngineInfoRow? engineInfo = null;
+            await using (var infoCmd = conn.CreateCommand())
+            {
+                // TODO: confirm table and columns. DeriveLocationSql reused — not duplicated.
+                infoCmd.CommandText = $@"
+SELECT TOP 1
+    C.PRODUCTID               AS ModelNo,
+    C.WORKORDERNO             AS JobNo,
+    {DeriveLocationSql}       AS CurrentLocation
+FROM   dbo.MPI_COB_T_SERIAL_NO_HISTORY C
+WHERE  C.SERIALNO = @esn
+ORDER  BY C.CREATEDON DESC;";
+
+                AddParam(infoCmd, "@esn", esn);
+                _logger.LogDebug("[ProductionReport] FetchEngineHistory INFO SQL esn={Esn}.", esn);
+
+                try
+                {
+                    await using var reader = await infoCmd.ExecuteReaderAsync(ct);
+                    if (await reader.ReadAsync(ct))
+                    {
+                        engineInfo = new EngineInfoRow
+                        {
+                            ModelNo         = ReadString(reader, "ModelNo"),
+                            JobNo           = ReadString(reader, "JobNo"),
+                            CurrentLocation = ReadString(reader, "CurrentLocation"),
+                        };
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    _logger.LogError(ex, "[ProductionReport] FetchEngineHistory INFO SQL error.");
+                    throw;
+                }
+            }
+
+            _logger.LogInformation(
+                "[ProductionReport] FetchEngineHistory info found={Found} esn={Esn}.",
+                engineInfo is not null, esn);
+
+            // ── Query 2: transaction history (paginated) ──────────────────────
+            long txnTotal = 0;
+            var txnRows = new List<TxnRow>();
+
+            await using (var countCmd = conn.CreateCommand())
+            {
+                // TODO: replace dbo.MPI_COB_T_SERIAL_NO_HISTORY with the correct
+                //       transaction table once identified.
+                countCmd.CommandText = @"
+SELECT COUNT(1)
+FROM   dbo.MPI_COB_T_SERIAL_NO_HISTORY
+WHERE  SERIALNO = @esn;";
+
+                AddParam(countCmd, "@esn", esn);
+
+                try
+                {
+                    var scalar = await countCmd.ExecuteScalarAsync(ct);
+                    txnTotal = scalar is DBNull or null ? 0L : Convert.ToInt64(scalar);
+                }
+                catch (SqlException ex)
+                {
+                    _logger.LogError(ex, "[ProductionReport] FetchEngineHistory TXN COUNT error.");
+                    throw;
+                }
+            }
+
+            if (txnTotal > 0)
+            {
+                int offset = (page - 1) * pageSize;
+                await using var txnCmd = conn.CreateCommand();
+
+                // TODO: select the correct columns once the transaction table is confirmed.
+                //       DeriveStatusSql is reused — not duplicated.
+                txnCmd.CommandText = $@"
+SELECT
+    C.APPLICATION             AS InitCode,
+    'TCL'                     AS OrgCode,
+    C.WORKORDERNO             AS WipJobNo,
+    C.SERIALNO                AS Esn,
+    C.LOTNO                   AS ActualMsbm,
+    {DeriveStatusSql}         AS Status,
+    C.APPLICATION             AS OracleStatus,
+    C.CREATEDON               AS ReceivedDate,
+    CAST(C.ID AS bigint)      AS GroupId
+FROM   dbo.MPI_COB_T_SERIAL_NO_HISTORY C
+WHERE  C.SERIALNO = @esn
+ORDER  BY C.CREATEDON DESC
+OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;";
+
+                AddParam(txnCmd, "@esn",      esn);
+                AddParam(txnCmd, "@offset",   offset);
+                AddParam(txnCmd, "@pageSize", pageSize);
+
+                _logger.LogDebug("[ProductionReport] FetchEngineHistory TXN PAGE SQL page={Page}.", page);
+
+                try
+                {
+                    await using var reader = await txnCmd.ExecuteReaderAsync(ct);
+                    while (await reader.ReadAsync(ct))
+                    {
+                        txnRows.Add(new TxnRow
+                        {
+                            InitCode     = ReadString(reader,   "InitCode"),
+                            OrgCode      = ReadString(reader,   "OrgCode"),
+                            WipJobNo     = ReadString(reader,   "WipJobNo"),
+                            Esn          = ReadString(reader,   "Esn"),
+                            ActualMsbm   = ReadString(reader,   "ActualMsbm"),
+                            Status       = ReadString(reader,   "Status"),
+                            OracleStatus = ReadString(reader,   "OracleStatus"),
+                            ReceivedDate = ReadDateTime(reader, "ReceivedDate"),
+                            GroupId      = ReadLong(reader,     "GroupId"),
+                        });
+                    }
+                    _logger.LogInformation(
+                        "[ProductionReport] FetchEngineHistory returned {Count} txn rows page {Page} esn={Esn}.",
+                        txnRows.Count, page, esn);
+                }
+                catch (SqlException ex)
+                {
+                    _logger.LogError(ex, "[ProductionReport] FetchEngineHistory TXN PAGE SQL error.");
+                    throw;
+                }
+            }
+
+            // ── Query 3: ERP subinventory ─────────────────────────────────────
+            var erpRows = new List<ErpRow>();
+            await using (var erpCmd = conn.CreateCommand())
+            {
+                // TODO: replace with the correct ERP subinventory table and columns.
+                erpCmd.CommandText = @"
+SELECT  C.APPLICATION   AS Subinventory,
+        COUNT(1)        AS Qty
+FROM    dbo.MPI_COB_T_SERIAL_NO_HISTORY C
+WHERE   C.SERIALNO = @esn
+  AND   C.APPLICATION IS NOT NULL
+GROUP   BY C.APPLICATION
+ORDER   BY C.APPLICATION;";
+
+                AddParam(erpCmd, "@esn", esn);
+                _logger.LogDebug("[ProductionReport] FetchEngineHistory ERP SQL esn={Esn}.", esn);
+
+                try
+                {
+                    await using var reader = await erpCmd.ExecuteReaderAsync(ct);
+                    while (await reader.ReadAsync(ct))
+                    {
+                        erpRows.Add(new ErpRow
+                        {
+                            Subinventory = ReadString(reader, "Subinventory"),
+                            Qty          = ReadInt(reader,    "Qty"),
+                        });
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    _logger.LogError(ex, "[ProductionReport] FetchEngineHistory ERP SQL error.");
+                    throw;
+                }
+            }
+
+            return new
+            {
+                engineInfo = (object?)engineInfo,
                 transactions = new
                 {
                     page,
                     pageSize,
-                    totalCount = 0,
-                    totalPages = 0,
-                    items      = Array.Empty<object>(),
+                    totalCount = txnTotal,
+                    totalPages = (int)Math.Ceiling((double)txnTotal / pageSize),
+                    items      = txnRows,
                 },
-                erpRows = Array.Empty<object>(),
-            });
+                erpRows,
+            };
         }
 
-        // ── Shared utilities (same pattern as ModelTrackingController) ────────
+        // ── Low-level helpers — identical style to WipController ──────────────
 
         private static void AddParam(IDbCommand cmd, string name, object value)
         {
@@ -315,15 +567,56 @@ namespace CMES.Controllers
             return r.IsDBNull(i) ? 0 : Convert.ToInt32(r.GetValue(i));
         }
 
+        private static long ReadLong(IDataRecord r, string col)
+        {
+            var i = r.GetOrdinal(col);
+            return r.IsDBNull(i) ? 0L : Convert.ToInt64(r.GetValue(i));
+        }
+
         private static DateTime? ReadDateTime(IDataRecord r, string col)
         {
             var i = r.GetOrdinal(col);
             return r.IsDBNull(i) ? null : r.GetDateTime(i);
         }
 
-        private static bool TryParseDate(string? input, out DateTime result)
+        private static bool TryParseDate(string? input, out DateTime result) =>
+            DateTime.TryParse(input, out result);
+
+        // ── Response DTOs ─────────────────────────────────────────────────────
+
+        private sealed class FesRow
         {
-            return DateTime.TryParse(input, out result);
+            public int       Sno        { get; set; }
+            public string?   Esn        { get; set; }
+            public string?   ModelNo    { get; set; }
+            public string?   JobOrderNo { get; set; }
+            public DateTime? FesDate    { get; set; }
+        }
+
+        private sealed class EngineInfoRow
+        {
+            public string? ModelNo         { get; set; }
+            public string? JobNo           { get; set; }
+            public string? CurrentLocation { get; set; }
+        }
+
+        private sealed class TxnRow
+        {
+            public string?   InitCode     { get; set; }
+            public string?   OrgCode      { get; set; }
+            public string?   WipJobNo     { get; set; }
+            public string?   Esn          { get; set; }
+            public string?   ActualMsbm   { get; set; }
+            public string?   Status       { get; set; }
+            public string?   OracleStatus { get; set; }
+            public DateTime? ReceivedDate { get; set; }
+            public long      GroupId      { get; set; }
+        }
+
+        private sealed class ErpRow
+        {
+            public string? Subinventory { get; set; }
+            public int     Qty          { get; set; }
         }
     }
 }

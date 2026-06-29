@@ -1,18 +1,15 @@
 /**
  * ModelTracking.jsx
  *
- * Model Tracking page — mirrors the legacy CMES Model Tracking view.
- *
- * ── Data-access layer ────────────────────────────────────────────────────────
- * Replace the two async stubs (fetchSummary / fetchDetails) with real fetch()
- * calls when the backend is live. Nothing else in the file changes.
+ * Model Tracking page.
+ * All data comes from the backend — no mock data, no fallback arrays.
  *
  * Endpoints:
- *   GET /api/modeltracking/summary?modelNo=<filter>&page=<n>&pageSize=50
- *   GET /api/modeltracking/details?modelNo=<filter>&page=<n>&pageSize=100
+ *   GET /api/modeltracking/summary?modelNo=<exact>&page=<n>&pageSize=50
+ *   GET /api/modeltracking/details?modelNo=<exact>&page=<n>&pageSize=100
  *
  * Both return: { page, pageSize, totalCount, totalPages, items: [...] }
- * ─────────────────────────────────────────────────────────────────────────────
+ * Summary also returns: { total: { modelNo:'TOTAL', fes, wip, ... } }
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,86 +19,26 @@ import './Reports.css'
 import './ModelTracking.css'
 
 // ═══════════════════════════════════════════════════════════════════
-// MOCK DATA — remove when real API is connected
+// DATA-ACCESS — replace body only when endpoint URL changes
 // ═══════════════════════════════════════════════════════════════════
 
-const MODELS = ['SO64815', 'SO64819', 'SO64929', 'SO60341', 'SO65210', 'SO63001']
-
-const MOCK_SUMMARY = MODELS.map((m, i) => ({
-  modelNo:      m,
-  wip:          Math.floor(Math.random() * 40) + 5,
-  fes:          Math.floor(Math.random() * 15),
-  qualityDock:  Math.floor(Math.random() * 10),
-  paintLine:    Math.floor(Math.random() * 8),
-  testCellLine: Math.floor(Math.random() * 12),
-  paintRepair:  Math.floor(Math.random() * 3),
-  testRework:   Math.floor(Math.random() * 2),
-  shortBuild:   Math.floor(Math.random() * 2),
-  eqaAudit:     Math.floor(Math.random() * 5),
-  mra:          Math.floor(Math.random() * 3),
-  pe:           Math.floor(Math.random() * 4),
-  unknown:      0,
-}))
-
-const LOCATIONS = ['LINESET', 'OLD LINE', 'NEW LINE', 'TEST CELL LINE', 'PAINT LINE', 'QUALITY DOCK', 'MRA']
-const STATUSES  = ['IN-PROD', 'ISSUE', 'IN REPAIR']
-
-const MOCK_DETAILS = Array.from({ length: 47 }, (_, i) => ({
-  serialNo:      `G459${4500 + i}`,
-  modelNo:       MODELS[i % MODELS.length],
-  blockLoadTime: new Date(2026, 4, 26, 6 + (i % 12), 10 + (i % 50)).toISOString(),
-  workOrderNo:   `318${8771 + i}-${(i % 5) + 1}`,
-  workstation:   String(34000 + (i % 8) * 1000),
-  status:        STATUSES[i % 3],
-  location:      LOCATIONS[i % LOCATIONS.length],
-  lastUpdatedOn: new Date(2026, 4, 26, 10 + (i % 8), i % 59).toISOString(),
-}))
-
-// ═══════════════════════════════════════════════════════════════════
-// DATA-ACCESS STUBS — only these two functions change when APIs land
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * TODO: Replace with:
- *   const res = await fetch(`/api/modeltracking/summary?modelNo=${encodeURIComponent(modelNo ?? '')}&page=${page}&pageSize=${pageSize}`)
- *   return res.json()
- */
 async function fetchSummary(modelNo, page, pageSize) {
-  await delay(400)
-  const filtered = modelNo
-    ? MOCK_SUMMARY.filter(r => r.modelNo.toLowerCase().includes(modelNo.toLowerCase()))
-    : MOCK_SUMMARY
-  const start = (page - 1) * pageSize
-  return {
-    items:      filtered.slice(start, start + pageSize),
-    totalCount: filtered.length,
-    page,
-    pageSize,
-    totalPages: Math.ceil(filtered.length / pageSize),
-  }
+  const params = new URLSearchParams({ page, pageSize })
+  if (modelNo) params.set('modelNo', modelNo)
+  const res = await fetch(`/api/modeltracking/summary?${params}`)
+  if (!res.ok) throw new Error(`Summary fetch failed: ${res.status}`)
+  return res.json()
+  // Returns: { page, pageSize, totalCount, totalPages, items, total }
 }
 
-/**
- * TODO: Replace with:
- *   const res = await fetch(`/api/modeltracking/details?modelNo=${encodeURIComponent(modelNo ?? '')}&page=${page}&pageSize=${pageSize}`)
- *   return res.json()
- */
 async function fetchDetails(modelNo, page, pageSize) {
-  await delay(500)
-  const filtered = modelNo
-    ? MOCK_DETAILS.filter(r => r.modelNo.toLowerCase().includes(modelNo.toLowerCase()))
-    : MOCK_DETAILS
-  const start = (page - 1) * pageSize
-  return {
-    items:      filtered.slice(start, start + pageSize),
-    totalCount: filtered.length,
-    page,
-    pageSize,
-    totalPages: Math.ceil(filtered.length / pageSize),
-  }
+  const params = new URLSearchParams({ page, pageSize })
+  if (modelNo) params.set('modelNo', modelNo)
+  const res = await fetch(`/api/modeltracking/details?${params}`)
+  if (!res.ok) throw new Error(`Details fetch failed: ${res.status}`)
+  return res.json()
+  // Returns: { page, pageSize, totalCount, totalPages, items }
 }
-
-const delay = ms => new Promise(r => setTimeout(r, ms))
 
 // ═══════════════════════════════════════════════════════════════════
 // HELPERS
@@ -112,12 +49,14 @@ function fmt(iso) {
   const d = new Date(iso)
   if (isNaN(d)) return iso
   const pad = n => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 const STATUS_COLORS = {
   'IN-PROD':   '#4CAF50',
   'ISSUE':     '#FF9800',
+  'FES':       '#9C27B0',
   'IN REPAIR': '#2196F3',
   'UNKNOWN':   '#9E9E9E',
 }
@@ -152,50 +91,62 @@ function ScrollTable({ children, minWidth = 700 }) {
 // ═══════════════════════════════════════════════════════════════════
 
 const SUMMARY_COLS = [
-  { key: 'fes',          label: 'FES'           },
-  { key: 'wip',          label: 'WIP'           },
-  { key: 'qualityDock',  label: 'Quality Dock'  },
-  { key: 'paintLine',    label: 'Paint Line'    },
-  { key: 'testCellLine', label: 'Test Cell Line'},
-  { key: 'paintRepair',  label: 'Paint Repair'  },
-  { key: 'testRework',   label: 'Test Rework'   },
-  { key: 'shortBuild',   label: 'Short Build'   },
-  { key: 'eqaAudit',     label: 'EQA Audit'     },
-  { key: 'mra',          label: 'MRA'           },
-  { key: 'pe',           label: 'PE'            },
-  { key: 'unknown',      label: 'Unknown'       },
+  { key: 'fes',          label: 'FES'            },
+  { key: 'wip',          label: 'WIP'            },
+  { key: 'qualityDock',  label: 'Quality Dock'   },
+  { key: 'paintLine',    label: 'Paint Line'     },
+  { key: 'testCellLine', label: 'Test Cell Line' },
+  { key: 'paintRepair',  label: 'Paint Repair'   },
+  { key: 'testRework',   label: 'Test Rework'    },
+  { key: 'shortBuild',   label: 'Short Build'    },
+  { key: 'eqaAudit',     label: 'EQA Audit'      },
+  { key: 'mra',          label: 'MRA'            },
+  { key: 'pe',           label: 'PE'             },
+  { key: 'unknown',      label: 'Unknown'        },
 ]
 
 function SummaryView({ queriedModel }) {
   const PAGE_SIZE = 50
   const [rows,       setRows]       = useState([])
+  const [totalRow,   setTotalRow]   = useState(null)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [page,       setPage]       = useState(1)
   const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(null)
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     setPage(1)
     fetchSummary(queriedModel, 1, PAGE_SIZE)
-      .then(r => { setRows(r.items); setTotalCount(r.totalCount); setTotalPages(r.totalPages) })
+      .then(r => {
+        setRows(r.items ?? [])
+        setTotalRow(r.total ?? null)
+        setTotalCount(r.totalCount ?? 0)
+        setTotalPages(r.totalPages ?? 1)
+      })
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [queriedModel])
 
   const loadPage = useCallback(p => {
     setLoading(true)
+    setError(null)
     fetchSummary(queriedModel, p, PAGE_SIZE)
-      .then(r => { setRows(r.items); setTotalCount(r.totalCount); setTotalPages(r.totalPages); setPage(p) })
+      .then(r => {
+        setRows(r.items ?? [])
+        setTotalRow(r.total ?? null)
+        setTotalCount(r.totalCount ?? 0)
+        setTotalPages(r.totalPages ?? 1)
+        setPage(p)
+      })
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [queriedModel])
 
-  // Compute totals for the TOTAL row
-  const totals = SUMMARY_COLS.reduce((acc, col) => {
-    acc[col.key] = rows.reduce((s, r) => s + (r[col.key] ?? 0), 0)
-    return acc
-  }, {})
-
-  if (loading) return <div className="report-state">Loading…</div>
+  if (loading) return <div className="report-table-box"><div className="report-state">Loading…</div></div>
+  if (error)   return <div className="report-table-box"><div className="report-state error">{error}</div></div>
 
   return (
     <>
@@ -219,7 +170,7 @@ function SummaryView({ queriedModel }) {
                     <td className="mt-model-cell">{row.modelNo}</td>
                     {SUMMARY_COLS.map(col => (
                       <td key={col.key} className="num">
-                        {row[col.key] > 0
+                        {(row[col.key] ?? 0) > 0
                           ? <span className="mt-nonzero">{row[col.key]}</span>
                           : <span className="mt-zero">0</span>
                         }
@@ -228,13 +179,13 @@ function SummaryView({ queriedModel }) {
                   </tr>
                 ))
               }
-              {/* TOTAL row — mirrors the legacy application */}
-              {rows.length > 0 && (
+              {/* TOTAL row — provided by the backend, no client-side recomputation */}
+              {totalRow && rows.length > 0 && (
                 <tr className="mt-total-row">
                   <td><strong>TOTAL</strong></td>
                   {SUMMARY_COLS.map(col => (
                     <td key={col.key} className="num">
-                      <strong>{totals[col.key]}</strong>
+                      <strong>{totalRow[col.key] ?? 0}</strong>
                     </td>
                   ))}
                 </tr>
@@ -261,23 +212,38 @@ function DetailsView({ queriedModel }) {
   const [totalPages, setTotalPages] = useState(1)
   const [page,       setPage]       = useState(1)
   const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(null)
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     setPage(1)
     fetchDetails(queriedModel, 1, PAGE_SIZE)
-      .then(r => { setRows(r.items); setTotalCount(r.totalCount); setTotalPages(r.totalPages) })
+      .then(r => {
+        setRows(r.items ?? [])
+        setTotalCount(r.totalCount ?? 0)
+        setTotalPages(r.totalPages ?? 1)
+      })
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [queriedModel])
 
   const loadPage = useCallback(p => {
     setLoading(true)
+    setError(null)
     fetchDetails(queriedModel, p, PAGE_SIZE)
-      .then(r => { setRows(r.items); setTotalCount(r.totalCount); setTotalPages(r.totalPages); setPage(p) })
+      .then(r => {
+        setRows(r.items ?? [])
+        setTotalCount(r.totalCount ?? 0)
+        setTotalPages(r.totalPages ?? 1)
+        setPage(p)
+      })
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [queriedModel])
 
-  if (loading) return <div className="report-state">Loading…</div>
+  if (loading) return <div className="report-table-box"><div className="report-state">Loading…</div></div>
+  if (error)   return <div className="report-table-box"><div className="report-state error">{error}</div></div>
 
   return (
     <>
@@ -311,9 +277,9 @@ function DetailsView({ queriedModel }) {
                       <span
                         className="mt-status-badge"
                         style={{
-                          background:  `${STATUS_COLORS[row.status] ?? '#555'}22`,
-                          color:        STATUS_COLORS[row.status] ?? '#aaa',
-                          borderColor: `${STATUS_COLORS[row.status] ?? '#555'}55`,
+                          background:  `${STATUS_COLORS[row.status] ?? '#888'}22`,
+                          color:        STATUS_COLORS[row.status] ?? '#555',
+                          borderColor: `${STATUS_COLORS[row.status] ?? '#888'}55`,
                         }}
                       >
                         {row.status}
@@ -341,22 +307,21 @@ function DetailsView({ queriedModel }) {
 
 export default function ModelTracking() {
   const [inputModel,   setInputModel]   = useState('')
-  const [queriedModel, setQueriedModel] = useState('')  // committed on Search click
-  const [activeTab,    setActiveTab]    = useState('summary')  // 'summary' | 'details'
+  const [queriedModel, setQueriedModel] = useState('')
+  const [activeTab,    setActiveTab]    = useState('summary')
 
   const todayLabel = new Date().toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
   })
 
-  const handleSearch = () => setQueriedModel(inputModel.trim())
-  const handleKeyDown = e => { if (e.key === 'Enter') handleSearch() }
+  const handleSearch  = () => setQueriedModel(inputModel.trim())
+  const handleKeyDown = e  => { if (e.key === 'Enter') handleSearch() }
 
   return (
     <div className="dash-root">
       <Sidebar />
       <div className="dash-main">
 
-        {/* ── Top bar ── */}
         <div className="dash-topbar">
           <div className="dash-topbar-left">
             <span className="dash-page-title">Model Tracking</span>
@@ -410,7 +375,6 @@ export default function ModelTracking() {
             </button>
           </div>
 
-          {/* ── Tab content ── */}
           {activeTab === 'summary' && <SummaryView queriedModel={queriedModel} />}
           {activeTab === 'details' && <DetailsView queriedModel={queriedModel} />}
 

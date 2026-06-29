@@ -1,4 +1,8 @@
-/* ─── ModelTracking.css ──────────────────────────────────────────────────── */
+/* ─── ModelTracking.css ─────────────────────────────────────────────────────
+   Page chrome (dash-root, dash-main, dash-topbar, dash-content) → PageShell.css
+   Table chrome (report-table-box, report-table, report-pager) → Reports.css
+   This file contains only Model Tracking–specific overrides.
+   ──────────────────────────────────────────────────────────────────────────── */
 
 /* ── Search bar ── */
 .mt-search-bar {
@@ -65,9 +69,7 @@
   padding: 5px 12px;
 }
 
-.mt-filter-chip strong {
-  color: rgba(255,255,255,0.9);
-}
+.mt-filter-chip strong { color: rgba(255,255,255,0.9); }
 
 /* ── Tab switcher ── */
 .mt-tabs {
@@ -91,28 +93,10 @@
   margin-bottom: -1px;
 }
 
-.mt-tab:hover       { color: rgba(255,255,255,0.85); }
-.mt-tab--active     { color: #fff; border-bottom-color: #8B0000; }
+.mt-tab:hover   { color: rgba(255,255,255,0.85); }
+.mt-tab--active { color: #fff; border-bottom-color: #8B0000; }
 
-/* ── Scrollable table wrapper ── */
-.mt-scroll-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 520px;
-}
-
-.mt-scroll-wrap::-webkit-scrollbar        { width: 7px; height: 7px; }
-.mt-scroll-wrap::-webkit-scrollbar-track  { background: #1e1e1e; }
-.mt-scroll-wrap::-webkit-scrollbar-thumb  { background: rgba(139,0,0,0.55); border-radius: 4px; }
-.mt-scroll-wrap::-webkit-scrollbar-thumb:hover { background: rgba(139,0,0,0.85); }
-
-.mt-scroll-wrap .report-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-/* ── Count label above table ── */
+/* ── Count label ── */
 .mt-count-label {
   font-size: 13px;
   color: rgba(255,255,255,0.45);
@@ -120,50 +104,87 @@
   margin-bottom: 10px;
 }
 
-/* ── Model column — stand-out weight and brightness ── */
+/* ── Scrollable table wrapper — white background starts here ── */
+.mt-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 520px;
+  background: #fff;      /* white table body, matching WIP Report */
+}
+
+.mt-scroll-wrap::-webkit-scrollbar        { width: 7px; height: 7px; }
+.mt-scroll-wrap::-webkit-scrollbar-track  { background: #e8e8e8; }
+.mt-scroll-wrap::-webkit-scrollbar-thumb  { background: #8B0000; border-radius: 4px; }
+.mt-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #6b0000; }
+
+/* Sticky header inside scroll wrapper */
+.mt-scroll-wrap .report-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* ── Override report-table cell colours for white background ── */
+.mt-scroll-wrap .report-table td {
+  color: #1a1a1a;                           /* dark text on white */
+  background: #fff;
+  border-top: 1px solid #e8e8e8;
+  font-size: 13px;
+}
+
+.mt-scroll-wrap .report-table tbody tr:nth-child(even) td {
+  background: #f7f7f7;                       /* alternating row tint */
+}
+
+.mt-scroll-wrap .report-table tbody tr:hover td {
+  background: #fff3e0;                       /* warm amber hover, same as WIP */
+}
+
+/* ── Model column ── */
 .mt-model-cell {
   font-weight: 700;
-  color: #fff !important;
+  color: #1a1a1a !important;
   white-space: nowrap;
 }
 
-/* ── Numeric cells in summary table ── */
+/* ── Numeric value colours — dark-on-white variants ── */
 .mt-nonzero {
-  color: #FFB74D;
+  color: #B71C1C;          /* deep red — visible on white, still prominent */
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .mt-zero {
-  color: rgba(255,255,255,0.25);
+  color: #bdbdbd;          /* light grey — clearly empty but not distracting */
   font-variant-numeric: tabular-nums;
 }
 
 /* ── TOTAL row ── */
 .mt-total-row td {
-  background: #2a2a2a !important;
+  background: #2c2c2c !important;
   border-top: 2px solid #8B0000 !important;
   color: #fff !important;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* ── Empty state inside table ── */
 .mt-empty {
   text-align: center;
   padding: 40px !important;
-  color: rgba(255,255,255,0.3) !important;
+  color: #999 !important;    /* grey on white bg */
   font-size: 14px;
+  background: #fff !important;
 }
 
-/* ── Monospace for codes / timestamps ── */
+/* ── Monospace for codes / timestamps — readable on white ── */
 .mt-mono {
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
-  color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  color: #37474F;           /* dark blue-grey, same as WIP Report .mono */
 }
 
-/* ── Status badge in details table ── */
+/* ── Status badge — opaque borders work on white bg ── */
 .mt-status-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -171,13 +192,13 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.4px;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   white-space: nowrap;
 }
 
 /* ── Responsive ── */
 @media (max-width: 700px) {
-  .mt-search-bar  { flex-direction: column; align-items: flex-start; }
+  .mt-search-bar   { flex-direction: column; align-items: flex-start; }
   .mt-search-input { max-width: 100%; }
-  .mt-tabs        { overflow-x: auto; }
+  .mt-tabs         { overflow-x: auto; }
 }
